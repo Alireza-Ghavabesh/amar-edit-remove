@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>داشبورد تعاملی تحلیل عملیات ویرایش و حذف</title>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;300;400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0b0f19;
+            --bg-card: #151d30;
+            --bg-card-hover: #1e2942;
+            --primary: #4f46e5;
+            --primary-light: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.15);
+            --accent-edit: #10b981;
+            --accent-edit-glow: rgba(16, 185, 129, 0.15);
+            --accent-delete: #ef4444;
+            --accent-delete-glow: rgba(239, 68, 68, 0.15);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #24304f;
+            --border-glow: rgba(255, 255, 255, 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Vazirmatn', sans-serif;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            overflow-x: hidden;
+        }
+
+        /* Top Header Styling */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, rgba(21, 29, 48, 0.8), rgba(11, 15, 25, 0.9));
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            padding: 1.5rem 2rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--primary-light), transparent);
+        }
+
+        .header-title h1 {
+            font-size: 1.8rem;
+            font-weight: 900;
+            background: linear-gradient(90deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.25rem;
+        }
+
+        .header-title p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        /* File Upload Zone */
+        .upload-zone {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            border: 2px dashed var(--border-color);
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            cursor: pointer;
+            background: rgba(21, 29, 48, 0.4);
+        }
+
+        .upload-zone:hover {
+            border-color: var(--primary-light);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .upload-zone input[type="file"] {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 1.5rem;
+            color: var(--primary-light);
+        }
+
+        .upload-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .upload-text strong {
+            color: var(--text-main);
+            display: block;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glow);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::after {
+            content: '';
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+            top: -20px;
+            left: -20px;
+            border-radius: 50%;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: -1px;
+        }
+
+        .stat-card.edit {
+            border-right: 4px solid var(--accent-edit);
+        }
+        .stat-card.edit .stat-value {
+            color: var(--accent-edit);
+        }
+
+        .stat-card.delete {
+            border-right: 4px solid var(--accent-delete);
+        }
+        .stat-card.delete .stat-value {
+            color: var(--accent-delete);
+        }
+
+        /* Main Workspace Layout */
+        .dashboard-body {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-body {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Sidebar Filters */
+        .sidebar {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-group label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .filter-group select, .filter-group input {
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            outline: none;
+            width: 100%;
+        }
+
+        .filter-group select:focus, .filter-group input:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 2px var(--primary-glow);
+        }
+
+        .btn-reset {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .btn-reset:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--text-muted);
+        }
+
+        /* Content Area */
+        .content-area {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* Cards & Containers */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* Charts Grid Styling */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .chart-card {
+            min-height: 380px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            height: 250px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chart-wrapper-large {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            height: 320px;
+        }
+
+        /* Table Styling */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-dark);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: right;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: rgba(21, 29, 48, 0.9);
+            color: var(--text-muted);
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: var(--bg-card-hover);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .badge.edit {
+            background-color: var(--accent-edit-glow);
+            color: var(--accent-edit);
+        }
+
+        .badge.delete {
+            background-color: var(--accent-delete-glow);
+            color: var(--accent-delete);
+        }
+
+        .badge.dept {
+            background-color: var(--primary-glow);
+            color: #818cf8;
+        }
+
+        /* Matrix Table Accent Classes */
+        .matrix-total {
+            font-weight: 700;
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .cell-highlight-edit {
+            color: var(--accent-edit);
+            font-weight: 700;
+        }
+
+        .cell-highlight-delete {
+            color: var(--accent-delete);
+            font-weight: 700;
+        }
+
+        /* Pagination & Actions */
+        .table-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0 0 0;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .pagination {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .page-btn {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background-color: var(--bg-card-hover);
+        }
+
+        .page-btn.active {
+            background-color: var(--primary-light);
+            border-color: var(--primary-light);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .row-details {
+            max-width: 500px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .row-details:hover {
+            white-space: normal;
+            word-break: break-all;
+        }
+
+        /* Dragover overlay */
+        .dragover {
+            border-color: var(--primary-light) !important;
+            background-color: rgba(99, 102, 241, 0.1) !important;
+        }
+
+        /* Toast Notifications */
+        .notification {
+            position: fixed;
+            bottom: 2rem;
+            left: 2rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-right: 4px solid var(--primary-light);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header-title">
+            <h1>داشبورد تحلیل عملیات ویرایش و حذف</h1>
+            <p id="data-source-info">بررسی آماری اقدامات ویرایش و حذف در سال‌های ۱۴۰۴ و ۱۴۰۵ بر اساس اطلاعات فایل A.xlsx</p>
+        </div>
+        
+        <!-- Drag and Drop Excel Uploader -->
+        <div class="upload-zone" id="drop-zone">
+            <span class="upload-icon">📂</span>
+            <div class="upload-text">
+                <strong>بارگذاری فایل اکسل جدید</strong>
+                <span>فایل را رها کنید یا برای انتخاب کلیک کنید</span>
+            </div>
+            <input type="file" id="excel-file-input" accept=".xlsx, .xls">
+        </div>
+    </header>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <span class="stat-label">کل درخواست ها (ردیف‌ها)</span>
+            <span class="stat-value" id="stat-total-rows">0</span>
+        </div>
+        <div class="stat-card edit">
+            <span class="stat-label">تعداد کل ویرایش‌ها</span>
+            <span class="stat-value" id="stat-total-edits">0</span>
+        </div>
+        <div class="stat-card delete">
+            <span class="stat-label">تعداد کل حذف‌ها</span>
+            <span class="stat-value" id="stat-total-deletes">0</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">درصد نسبت ویرایش به حذف</span>
+            <span class="stat-value" id="stat-ratio-percent">0٪</span>
+        </div>
+    </div>
+
+    <!-- Main Section -->
+    <div class="dashboard-body">
+        
+        <!-- Filters Sidebar -->
+        <aside class="sidebar">
+            <h3 style="font-weight: 800; font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">فیلترها</h3>
+            
+            <div class="filter-group">
+                <label for="filter-year">سال</label>
+                <select id="filter-year">
+                    <option value="all">همه سال‌ها</option>
+                    <option value="1404">۱۴۰۴</option>
+                    <option value="1405">۱۴۰۵</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="filter-month">ماه</label>
+                <select id="filter-month">
+                    <option value="all">همه ماه‌ها</option>
+                    <option value="1">فروردین (۱)</option>
+                    <option value="2">اردیبهشت (۲)</option>
+                    <option value="3">خرداد (۳)</option>
+                    <option value="4">تیر (۴)</option>
+                    <option value="5">مرداد (۵)</option>
+                    <option value="6">شهریور (۶)</option>
+                    <option value="7">مهر (۷)</option>
+                    <option value="8">آبان (۸)</option>
+                    <option value="9">آذر (۹)</option>
+                    <option value="10">دی (۱۰)</option>
+                    <option value="11">بهمن (۱۱)</option>
+                    <option value="12">اسفند (۱۲)</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="filter-dept">واحد سازمانی</label>
+                <select id="filter-dept">
+                    <option value="all">همه واحدها</option>
+                    <option value="حسابداری">حسابداری</option>
+                    <option value="فروش">فروش</option>
+                    <option value="انبار">انبار</option>
+                    <option value="تدارکات">تدارکات</option>
+                    <option value="سایر / نامشخص">سایر / نامشخص</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="filter-action">نوع اقدام</label>
+                <select id="filter-action">
+                    <option value="all">همه اقدام‌ها</option>
+                    <option value="ویرایش">ویرایش</option>
+                    <option value="حذف">حذف</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="filter-search">جستجو در موضوع</label>
+                <input type="text" id="filter-search" placeholder="کلمه کلیدی را بنویسید...">
+            </div>
+
+            <button class="btn-reset" id="btn-reset-filters">پاک کردن فیلترها</button>
+        </aside>
+
+        <!-- Content Area -->
+        <main class="content-area">
+            
+            <!-- Charts Grid (Circle Charts) -->
+            <div class="charts-grid">
+                <!-- Circle Donut Chart (Edit vs Delete) -->
+                <div class="card chart-card">
+                    <div class="card-header" style="border-bottom:none; padding-bottom:0;">
+                        <h3 class="card-title">🍩 نسبت نوع اقدام</h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-pie-action"></canvas>
+                    </div>
+                </div>
+
+                <!-- Doughnut Chart (Department breakdown) -->
+                <div class="card chart-card">
+                    <div class="card-header" style="border-bottom:none; padding-bottom:0;">
+                        <h3 class="card-title">🏢 سهم اقدامات به تفکیک واحد</h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-doughnut-dept"></canvas>
+                    </div>
+                </div>
+
+                <!-- MoM Trend Line Area Chart -->
+                <div class="card chart-card full-width">
+                    <div class="card-header" style="border-bottom:none; padding-bottom:0;">
+                        <h3 class="card-title">📈 نمودار روند ماهانه اقدامات (حذف و ویرایش)</h3>
+                    </div>
+                    <div class="chart-wrapper-large">
+                        <canvas id="chart-line-trend"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Matrix Summary Table -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h3 class="card-title">📊 جدول ماتریسی عملکرد واحدها به تفکیک زمان</h3>
+                        <span class="card-desc">گزارش خلاصه تعداد ویرایش و حذف بر اساس فیلترهای بالا</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="matrix-table">
+                        <thead>
+                            <tr>
+                                <th>دوره زمانی</th>
+                                <th>واحد سازمانی</th>
+                                <th style="color: var(--accent-edit);">تعداد ویرایش</th>
+                                <th style="color: var(--accent-delete);">تعداد حذف</th>
+                                <th>کل اقدامات</th>
+                                <th>نسبت (ویرایش به حذف)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matrix-table-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Raw Data Details Table -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h3 class="card-title">🔍 جزئیات ردیف‌های منطبق بر فیلتر</h3>
+                        <span class="card-desc" id="rows-count-text">ردیفی پیدا نشد</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="details-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">ردیف اکسل</th>
+                                <th style="width: 140px;">تاریخ مشاهده</th>
+                                <th style="width: 150px;">واحد سازمانی</th>
+                                <th style="width: 100px;">نوع اقدام</th>
+                                <th>موضوع تراکنش</th>
+                            </tr>
+                        </thead>
+                        <tbody id="details-table-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <div class="pagination" id="pagination-controls">
+                        <!-- Dynamic pages -->
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);" id="pagination-text">
+                        صفحه ۱ از ۱
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // Seed initial data parsed from A.xlsx
+        let dataset = [{"rowNum":2,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 6367","dateStr":"11:22 1405/04/09","year":1405,"month":4,"department":"حسابداری","action":"حذف"},{"rowNum":3,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت6057-4213","dateStr":"11:26 1405/04/09","year":1405,"month":4,"department":"حسابداری","action":"حذف"},{"rowNum":4,"subject":"ارجاع به دیگری: ثبت باسکول چسب","dateStr":"07:40 1405/04/09","year":1405,"month":4,"department":"انبار","action":"ویرایش"},{"rowNum":5,"subject":"ارجاع به دیگری: ثبت باسکول چسب","dateStr":"14:33 1405/04/08","year":1405,"month":4,"department":"انبار","action":"ویرایش"},{"rowNum":6,"subject":"ارجاع به دیگری: در خصوص حذف سفارش 146953 و اسناد بعد از آن مربوط به خرید اقلام نذری محرم از آتنا مارکت به دلیل ویرایش سفارش","dateStr":"13:07 1405/04/08","year":1405,"month":4,"department":"تدارکات","action":"حذف"},{"rowNum":7,"subject":"ارجاع به دیگری: ثبت باسکول چسب","dateStr":"13:17 1405/04/08","year":1405,"month":4,"department":"انبار","action":"ویرایش"},{"rowNum":8,"subject":"ارجاع به دیگری: تغییر وضعیت محصول خریداری شده ام دی اف پشت پرینتی آقای احمد رفیعی دستجردی و انتقال آن به شرکت بلوط زرین اسپادانا","dateStr":"08:01 1405/04/08","year":1405,"month":4,"department":"تدارکات","action":"ویرایش"},{"rowNum":9,"subject":"ارجاع به دیگری: حذف درخواست کالا 76207","dateStr":"12:58 1405/04/07","year":1405,"month":4,"department":"انبار","action":"حذف"},{"rowNum":10,"subject":"ارجاع به دیگری: حذف فاکتور 2441 (سام پلاستیک طلوع نوین)","dateStr":"12:58 1405/04/07","year":1405,"month":4,"department":"فروش","action":"حذف"},{"rowNum":11,"subject":"ارجاع به دیگری: حذف انتقال 816-818-820 -بانک انتقالی را انجام نداده است","dateStr":"08:15 1405/04/08","year":1405,"month":4,"department":"حسابداری","action":"حذف"},{"rowNum":12,"subject":"ارجاع به دیگری: حذف درخواست پرداخت های کنسل شده","dateStr":"08:01 1405/04/08","year":1405,"month":4,"department":"حسابداری","action":"حذف"},{"rowNum":13,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 5242","dateStr":"08:16 1405/04/07","year":1405,"month":4,"department":"حسابداری","action":"حذف"},{"rowNum":14,"subject":"ارجاع به دیگری: درخواست حذف سفارش 146871","dateStr":"16:05 1405/04/06","year":1405,"month":4,"department":"تدارکات","action":"حذف"},{"rowNum":15,"subject":"ارجاع به دیگری: ثبت موقت رسید دریافت","dateStr":"10:57 1405/04/06","year":1405,"month":4,"department":"حسابداری","action":"ویرایش"},{"rowNum":16,"subject":"ارجاع به دیگری: اصلاح سفارش و حذف برگ توزین","dateStr":"11:13 1405/04/06","year":1405,"month":4,"department":"انبار","action":"حذف"},{"rowNum":17,"subject":"ارجاع به دیگری: صورتجلسه حذف سفارش  146704 ( درخواست خرید 60237 )","dateStr":"11:46 1405/04/06","year":1405,"month":4,"department":"تدارکات","action":"حذف"},{"rowNum":18,"subject":"ارجاع به دیگری: اصلاح سفارش و حذف برگ توزین","dateStr":"11:56 1405/04/06","year":1405,"month":4,"department":"انبار","action":"حذف"},{"rowNum":19,"subject":"ارجاع به دیگری: اصلاح سفارش و حذف برگ توزین","dateStr":"12:35 1405/04/06","year":1405,"month":4,"department":"انبار","action":"حذف"},{"rowNum":20,"subject":"ارجاع به دیگری: اصلاح سفارش و حذف برگ توزین","dateStr":"11:37 1405/04/06","year":1405,"month":4,"department":"انبار","action":"حذف"},{"rowNum":21,"subject":"ارجاع به دیگری: حذف تمام اسامی در فهرست تعداد چک مشتریان","dateStr":"10:59 1405/04/06","year":1405,"month":4,"department":"فروش","action":"حذف"},{"rowNum":22,"subject":"ارجاع به دیگری: درخصوص حذف درخواست درخواست خرید 60725","dateStr":"08:29 1405/04/06","year":1405,"month":4,"department":"تدارکات","action":"حذف"},{"rowNum":23,"subject":"ارجاع به دیگری: در خصوص تغییر وضعیت پیش فاکتور خانم مینا حاجیان فروشانی","dateStr":"08:25 1405/04/06","year":1405,"month":4,"department":"فروش","action":"ویرایش"},{"rowNum":24,"subject":"ارجاع به دیگری: عدم تایید اطلاعات دریافت/پرداخت 155566","dateStr":"10:50 1405/04/02","year":1405,"month":4,"department":"حسابداری","action":"ویرایش"},{"rowNum":25,"subject":"عدم تایید اطلاعات دریافت/پرداخت 155566","dateStr":"09:55 1405/04/02","year":1405,"month":4,"department":"حسابداری","action":"ویرایش"},{"rowNum":26,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت","dateStr":"09:58 1405/04/02","year":1405,"month":4,"department":"حسابداری","action":"حذف"},{"rowNum":27,"subject":"ارجاع به دیگری: اصلاحیه اعلامیه پرداخت 5756","dateStr":"10:50 1405/04/02","year":1405,"month":4,"department":"حسابداری","action":"ویرایش"},{"rowNum":28,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام نشده  - بانک از حساب شرکت برداشت نگردیده است","dateStr":"15:09 1405/03/31","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":29,"subject":"ارجاع به دیگری: ابطال دستور پرداخت    - بانک از حساب شرکت برداشت نگردیده است","dateStr":"12:51 1405/03/31","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":30,"subject":"ارجاع به دیگری: ابطال دستور پرداخت   - بانک از حساب شرکت برداشت نگردیده است (25-03-1405)","dateStr":"12:51 1405/03/31","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":31,"subject":"ارجاع به دیگری: ثبت موقت رسید دریافت","dateStr":"10:56 1405/03/31","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":32,"subject":"ارجاع به دیگری: ثبت موقت درخواست پرداخت 161491 (به دلیل تغییر شبای بانک ملی)","dateStr":"08:18 1405/03/31","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":33,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 161801 (پرداخت شده از کارت تنخواه)","dateStr":"16:05 1405/03/30","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":34,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام نشده  - بانک از حساب شرکت برداشت نگردیده است","dateStr":"12:38 1405/03/30","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":35,"subject":"ارجاع به دیگری: ابطال دستور پرداخت انجام نشده  - بانک از حساب شرکت برداشت نگردیده است (27-03-1405)","dateStr":"نامشخص","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":36,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت   - بانک به جای برداشت از حساب تخته فشرده از حساب خوزستان  شرکت برداشت گردیده است","dateStr":"نامشخص","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":37,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 161795 و اطلاعات دریافت/پرداخت 155413","dateStr":"12:43 1405/03/30","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":38,"subject":"ارجاع به دیگری: درخواست حذف  اعلامیه بدهکار بستانکار شماره 510","dateStr":"12:37 1405/03/30","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":39,"subject":"ارجاع به دیگری: ثبت موقت درخواست پرداخت 161608","dateStr":"12:43 1405/03/30","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":40,"subject":"ارجاع به دیگری: حذف درخواست 75563","dateStr":"12:43 1405/03/30","year":1405,"month":3,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":41,"subject":"ارجاع به دیگری: درخصوص پیش فاکتور ام دی اف آقای محمد دادگر عیلام 1405/1002076","dateStr":"12:51 1405/03/30","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":42,"subject":"ارجاع به دیگری: حذف درخواست 75226","dateStr":"12:52 1405/03/30","year":1405,"month":3,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":43,"subject":"ارجاع به دیگری: حذف فاکتور خرید","dateStr":"12:58 1405/03/30","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":44,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 5559 ( مورخ 30-02-1405)","dateStr":"12:51 1405/03/30","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":45,"subject":"ارجاع به دیگری: درخواست ویرایش رسید دریافت 981","dateStr":"12:18 1405/03/27","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":46,"subject":"ارجاع به دیگری: حذف سند حسابداری و برگشت از تایید رسید دریافت شماره 1661 + 2029","dateStr":"08:02 1405/03/30","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":47,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتورهای آقایان عارف الهائی و حسین حمادی(بشکه 1000 لیتری ضایعات)","dateStr":"08:49 1405/03/27","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":48,"subject":"ارجاع به دیگری: حذف فاکتور خرید","dateStr":"13:51 1405/03/26","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":49,"subject":"ارجاع به دیگری: حذف مراحل سفارش خرید 156036","dateStr":"13:57 1405/03/26","year":1405,"month":3,"department":"تدارکات","action":"حذف"},{"rowNum":50,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای مجتبی شجاعی","dateStr":"08:46 1405/03/27","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":51,"subject":"ارجاع به دیگری: در خصوص حذف درخواست به شماره 4974","dateStr":"07:35 1405/03/27","year":1405,"month":3,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":52,"subject":"ارجاع به دیگری: استعلام پرداختی مشتری جهت پیش فاکتور شماره 1000018","dateStr":"12:43 1405/03/26","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":53,"subject":"ارجاع به دیگری: حذف سند حسابداری 30699","dateStr":"09:56 1405/03/26","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":54,"subject":"ارجاع به دیگری: حذف سند حسابداری و برگشت از تایید رسید دریافت شماره 7507 - جهت شناس شدن رسید دریافت","dateStr":"09:56 1405/03/26","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":55,"subject":"ارجاع به دیگری: ابطال دستور پرداخت انجام نشده  - بانک از حساب شرکت برداشت نگردیده است (24-03-1405)","dateStr":"09:15 1405/03/26","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":56,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 4365 ( به مبلغ 4.000.000.000 ریال)","dateStr":"09:15 1405/03/26","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":57,"subject":"ارجاع به دیگری: حذف سند حسابداری شماره 20119","dateStr":"08:14 1405/03/26","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":58,"subject":"ارجاع به دیگری: تسمه پلاستیکی به توزین86833","dateStr":"08:11 1405/03/26","year":1405,"month":3,"department":"انبار","action":"ویرایش"},{"rowNum":59,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور شرکت مانشت چوب تجارت نوین","dateStr":"11:38 1405/03/25","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":60,"subject":"ارجاع به دیگری: ثبت موقت درخواست پرداخت 161520","dateStr":"10:26 1405/03/25","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":61,"subject":"ارجاع به دیگری: ثبت موقت درخواست پرداخت 161461 و 161374","dateStr":"10:11 1405/03/25","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":62,"subject":"ارجاع به دیگری: درخواست حذف تحویل به شماره 164420","dateStr":"10:11 1405/03/25","year":1405,"month":3,"department":"تدارکات","action":"حذف"},{"rowNum":63,"subject":"ارجاع به دیگری: ابطال دستور پرداخت انجام نشده  - بانک از حساب شرکت برداشت نگردیده است (23-03-1405)","dateStr":"10:10 1405/03/25","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":64,"subject":"ارجاع به دیگری: ابطال دستور پرداخت انجام نشده  - بانک از حساب شرکت برداشت نگردیده است (23-03-1405)","dateStr":"10:08 1405/03/25","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":65,"subject":"ارجاع به دیگری: تسمه پلاستیکی به توزین86833","dateStr":"07:33 1405/03/25","year":1405,"month":3,"department":"انبار","action":"ویرایش"},{"rowNum":66,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 3659-5036","dateStr":"09:17 1405/03/24","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":67,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام نشده  - بانک از حساب شرکت برداشت نگردیده است","dateStr":"07:34 1405/03/24","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":68,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای محمد هادی حسینی","dateStr":"07:36 1405/03/24","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":69,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 3022  - بانک از حساب شرکت کمتر برداشت گردیده است","dateStr":"07:34 1405/03/24","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":70,"subject":"ارجاع به دیگری: صورتجلسه هزینه تکمیلی 13783( در ادامه نامه  20171 که فاقد امضا بود|)","dateStr":"13:37 1405/03/23","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":71,"subject":"ارجاع به دیگری: صورتجلسه حذف هزینه تکمیلی 13829","dateStr":"12:09 1405/03/23","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":72,"subject":"ارجاع به دیگری: حذف تحویل","dateStr":"12:08 1405/03/23","year":1405,"month":3,"department":"تدارکات","action":"حذف"},{"rowNum":73,"subject":"ارجاع به دیگری: حذف فاکتور خرید","dateStr":"12:08 1405/03/23","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":74,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 2678","dateStr":"12:04 1405/03/23","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":75,"subject":"ارجاع به دیگری: تحویل شماره حساب بانک اقتصاد نوین - خرداد ماه 1405","dateStr":"11:56 1405/03/23","year":1405,"month":3,"department":"تدارکات","action":"ویرایش"},{"rowNum":76,"subject":"ارجاع به دیگری: برگزاری پویش اهدای خون _ روز یک شنبه مورخ 24 خرداد ماه","dateStr":"15:27 1405/03/20","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":77,"subject":"ارجاع به دیگری: درخواست برگشت از تاییدیه درخواست 75200","dateStr":"08:51 1405/03/20","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":78,"subject":"ارجاع به دیگری: ثبت موقت و حذف سند حسابداری رسید دریافت","dateStr":"08:37 1405/03/20","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":79,"subject":"ارجاع به دیگری: حذف سند حسادبداری 28256 ( مورخ 09-02-1405)","dateStr":"08:26 1405/03/20","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":80,"subject":"ارجاع به دیگری: درخواست اصلاح استقرار شماره 1669","dateStr":"08:06 1405/03/20","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":81,"subject":"ارجاع به دیگری: حذف صورت خلاصه تنخواه به شماره 5975","dateStr":"07:50 1405/03/20","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":82,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای عبدالرضا شاکر","dateStr":"12:35 1405/03/19","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":83,"subject":"ارجاع به دیگری: درخواست حذف پیوست های سفارش 145882: «قاب و لیبل جهت حسینیه»","dateStr":"08:10 1405/03/19","year":1405,"month":3,"department":"تدارکات","action":"حذف"},{"rowNum":84,"subject":"ارجاع به دیگری: حذف سند حسابداری 3290","dateStr":"15:32 1405/03/18","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":85,"subject":"ارجاع به دیگری: حذف شماره سفارش و تحویل","dateStr":"14:00 1405/03/18","year":1405,"month":3,"department":"تدارکات","action":"حذف"},{"rowNum":86,"subject":"ارجاع به دیگری: حذف سند حسابداری ثبت موقت رسید دریافت 1818","dateStr":"15:56 1405/03/17","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":87,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای عباس الهائی(ضایعات)","dateStr":"14:02 1405/03/17","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":88,"subject":"ارجاع به دیگری: درخصوص اجازه ی دسترسی به اینترنت","dateStr":"11:05 1405/03/17","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":89,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام نشده  - بانک از حساب شرکت برداشت نگردیده است","dateStr":"10:38 1405/03/17","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":90,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت ها - وصول- رسید دریافت","dateStr":"10:39 1405/03/17","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":91,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 3642( مورخ 08-02-1405)","dateStr":"11:30 1405/03/17","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":92,"subject":"ارجاع به دیگری: حذف درخواست کالا مربوط به فرم های فروشگاه","dateStr":"11:35 1405/03/17","year":1405,"month":3,"department":"انبار","action":"حذف"},{"rowNum":93,"subject":"ارجاع به دیگری: بررسی جهت ثبت 2 عدد دستور پرداخت از یک درخواست پرداخت توسط سیستم","dateStr":"08:03 1405/03/17","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":94,"subject":"ارجاع به دیگری: ثبت موقت و حذف سند حسابداری رسید دریافت 1162","dateStr":"14:17 1405/03/16","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":95,"subject":"ارجاع به دیگری: ثبت موقت درخواست پرداخت 161061","dateStr":"13:32 1405/03/16","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":96,"subject":"ارجاع به دیگری: حذف سفارش","dateStr":"12:16 1405/03/16","year":1405,"month":3,"department":"تدارکات","action":"حذف"},{"rowNum":97,"subject":"ارجاع به دیگری: ابطال دستور پرداخت 99298 (شرکت صنعتی و تولیدی سامد مشهد)","dateStr":"12:17 1405/03/16","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":98,"subject":"ارجاع به دیگری: حذف شماره رخواست 4594","dateStr":"08:41 1405/03/16","year":1405,"month":3,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":99,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 4009 ( مورخ 12-03-1405)","dateStr":"07:32 1405/03/16","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":100,"subject":"ارجاع به دیگری: گزارش کار 1405/2/2","dateStr":"14:05 1405/03/13","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":101,"subject":"ارجاع به دیگری: گزارش کار 1405/2/2","dateStr":"نامشخص","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":102,"subject":"ارجاع به دیگری: درخواست حذف  اعلامیه بدهکار بستانکار شماره 504","dateStr":"10:07 1405/03/13","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":103,"subject":"ارجاع به دیگری: ثبت موقت و حذف سند حسابداری رسیددریافت شماره 1923","dateStr":"07:51 1405/03/13","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":104,"subject":"ارجاع به دیگری: درخواست ابطال نامه خروج","dateStr":"07:34 1405/03/13","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":105,"subject":"ارجاع به دیگری: حذف مجوز تخلیه وبرگ توزین","dateStr":"07:33 1405/03/13","year":1405,"month":3,"department":"انبار","action":"حذف"},{"rowNum":106,"subject":"ارجاع به دیگری: ثبت موقت رسید دریافت","dateStr":"12:22 1405/03/12","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":107,"subject":"ارجاع به دیگری: درخواست حذف و برگشت از تایید","dateStr":"13:06 1405/03/12","year":1405,"month":3,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":108,"subject":"ارجاع به دیگری: درخواست حذف و برگشت از تایید","dateStr":"13:32 1405/03/12","year":1405,"month":3,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":109,"subject":"ارجاع به دیگری: در خصوص گواهی تامین وجه شماره 1496","dateStr":"13:35 1405/03/12","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":110,"subject":"ارجاع به دیگری: حذف مجوز تخلیه وبرگ توزین","dateStr":"13:06 1405/03/12","year":1405,"month":3,"department":"انبار","action":"حذف"},{"rowNum":111,"subject":"ارجاع به دیگری: حذف حواله و در حالت ثبت قرار دادن پیش فاکتور شرکت آرمان کالای آپادانا","dateStr":"12:22 1405/03/12","year":1405,"month":3,"department":"فروش","action":"حذف"},{"rowNum":112,"subject":"ارجاع به دیگری: حذف مجوز تخلیه وبرگ توزین","dateStr":"11:47 1405/03/12","year":1405,"month":3,"department":"انبار","action":"حذف"},{"rowNum":113,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 22( مورخ 16-01-1405)","dateStr":"10:25 1405/03/12","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":114,"subject":"ارجاع به دیگری: حذف سند حسابداری و برگشت از تایید رسید دریافت شماره 622","dateStr":"10:22 1405/03/12","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":115,"subject":"ارجاع به دیگری: حذف سند حسابداری شماره 24005","dateStr":"10:18 1405/03/12","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":116,"subject":"ارجاع به دیگری: حذف سفارش و تحویل","dateStr":"16:10 1405/03/11","year":1405,"month":3,"department":"تدارکات","action":"حذف"},{"rowNum":117,"subject":"ارجاع به دیگری: اصلاح وزن دوم وحذف مراحل تخلیه","dateStr":"07:27 1405/03/12","year":1405,"month":3,"department":"انبار","action":"حذف"},{"rowNum":118,"subject":"ارجاع به دیگری: در خصوص تغییر وضعیت حواله مشتری آقای نبی زاده","dateStr":"07:27 1405/03/12","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":119,"subject":"ارجاع به دیگری: درخصوص تغییر وضعیت پیش فاکتور ام دی اف آقای صمد چراغ زاده","dateStr":"07:21 1405/03/12","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":120,"subject":"ارجاع به دیگری: حذف انتقال 347-بانک انتقالی را انجام نداده است","dateStr":"15:58 1405/03/11","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":121,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 2415","dateStr":"15:58 1405/03/11","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":122,"subject":"ارجاع به دیگری: حضور نمایندگان بانک ملت","dateStr":"15:50 1405/03/11","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":123,"subject":"درخصوص تغییر وضعیت پیش فاکتور ام دی اف آقای امین تاجمیری زراس","dateStr":"11:25 1405/03/11","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":124,"subject":"ارجاع به دیگری: ثبت موقت رسید دریافت شماره 256","dateStr":"10:00 1405/03/11","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":125,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 49 ( مورخ 20-01-1405)","dateStr":"10:00 1405/03/11","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":126,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 2207","dateStr":"09:59 1405/03/11","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":127,"subject":"ارجاع به دیگری: درخواست حذف  اعلامیه بدهکار بستانکار شماره 502","dateStr":"14:56 1405/03/10","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":128,"subject":"ارجاع به دیگری: راهنمایی فعالسازی کارت های بانک ملت پرسنل","dateStr":"13:24 1405/03/10","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":129,"subject":"ارجاع به دیگری: در خصوص تغییر وضعیت پیش فاکتور اقای جهاد محمدی زاده","dateStr":"14:05 1405/03/10","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":130,"subject":"ارجاع به دیگری: حذف درخواست کالا شماره 74394","dateStr":"13:59 1405/03/10","year":1405,"month":3,"department":"انبار","action":"حذف"},{"rowNum":131,"subject":"ارجاع به دیگری: حذف مجوز ضایعات","dateStr":"13:02 1405/03/10","year":1405,"month":3,"department":"انبار","action":"حذف"},{"rowNum":132,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 2321","dateStr":"16:12 1405/03/09","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":133,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 2246","dateStr":"16:14 1405/03/09","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":134,"subject":"ارجاع به دیگری: حذف فاکتور خرید","dateStr":"13:24 1405/03/09","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":135,"subject":"ارجاع به دیگری: حذف فاکتور خرید","dateStr":"12:33 1405/03/09","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":136,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور مشارکت  داوود یوسفیان قهفرخی و رضا یوسفیان قهفرخی","dateStr":"12:33 1405/03/09","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":137,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 160505 و اطلاعات دریافت/پرداخت 154072","dateStr":"07:26 1405/03/07","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":138,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور محمد دادگر عیلام","dateStr":"16:08 1405/03/05","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":139,"subject":"ارجاع به دیگری: پیرو حذف هزینه تکمیلی 13602","dateStr":"16:17 1405/03/05","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":140,"subject":"ارجاع به دیگری: پیرو حذف هزینه تکمیلی 13602","dateStr":"15:10 1405/03/05","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":141,"subject":"درخواست تعطیل کاری/اضافه کاری","dateStr":"13:43 1405/03/05","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":142,"subject":"درخواست تعطیل کاری/اضافه کاری","dateStr":"12:16 1405/03/05","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":143,"subject":"درخواست تعطیل کاری/اضافه کاری","dateStr":"12:15 1405/03/05","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":144,"subject":"درخواست تعطیل کاری/اضافه کاری","dateStr":"12:12 1405/03/05","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":145,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور شرکت پرویزی تجارت تاج","dateStr":"12:30 1405/03/05","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":146,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 160427 و اطلاعات دریافت/پرداخت 153979","dateStr":"11:44 1405/03/05","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":147,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای عبدالحمید حسن زاده نجار قشمی","dateStr":"11:23 1405/03/05","year":1405,"month":3,"department":"فروش","action":"ویرایش"},{"rowNum":148,"subject":"ارجاع به دیگری: تغییر وضعیت محصول خریداری شده ام دی اف پشت پرینتی آقای علی گودرزی و انتقال به آقای محمد دادگر عیلام","dateStr":"09:13 1405/03/05","year":1405,"month":3,"department":"تدارکات","action":"ویرایش"},{"rowNum":149,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده  - بانک از حساب شرکت برداشت نگردیده است (05-02-1405)","dateStr":"10:08 1405/03/04","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":150,"subject":"ارجاع به دیگری: اطلاعیه برنامه ریزی جهت سمپاشی و مباره با آفات (روز چارشنبه)","dateStr":"10:12 1405/03/04","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":151,"subject":"اعلام زادروز پرسنل گروه صنعتی نوین چوب","dateStr":"16:08 1405/03/03","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":152,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 2051 + 2132 + 2155","dateStr":"13:03 1405/03/03","year":1405,"month":3,"department":"حسابداری","action":"ویرایش"},{"rowNum":153,"subject":"ارجاع به دیگری: درخواست تغییر وضعیت تحویل","dateStr":"12:02 1405/03/03","year":1405,"month":3,"department":"تدارکات","action":"ویرایش"},{"rowNum":154,"subject":"ارجاع به دیگری: حذف پیوست سفارش 144434","dateStr":"11:59 1405/03/03","year":1405,"month":3,"department":"تدارکات","action":"حذف"},{"rowNum":155,"subject":"ارجاع به دیگری: حذف انتقال 394-بانک انتقالی را انجام نداده است","dateStr":"08:50 1405/03/03","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":156,"subject":"ارجاع به دیگری: حذف انتقال 394-بانک انتقالی را انجام نداده است","dateStr":"08:41 1405/03/03","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":157,"subject":"ارجاع به دیگری: حذف سند حسابداری شماره  128997","dateStr":"08:34 1405/03/03","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":158,"subject":"ارجاع به دیگری: در خصوص در حالت ثبت قرار گرفتن اقای نجم موسوی","dateStr":"15:58 1405/03/02","year":1405,"month":3,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":159,"subject":"ارجاع به دیگری: حذف گواهی تامین وجه شماره 1484","dateStr":"16:00 1405/03/02","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":160,"subject":"ارجاع به دیگری: درخواست حذف سفارش 143749","dateStr":"15:50 1405/03/02","year":1405,"month":3,"department":"تدارکات","action":"حذف"},{"rowNum":161,"subject":"ارجاع به دیگری: صورت جلسه حذف تحویل به شماره 158951","dateStr":"09:00 1405/03/02","year":1405,"month":3,"department":"تدارکات","action":"حذف"},{"rowNum":162,"subject":"ارجاع به دیگری: اصلاح وزن دوم","dateStr":"08:53 1405/03/02","year":1405,"month":3,"department":"انبار","action":"ویرایش"},{"rowNum":163,"subject":"ارجاع به دیگری: حذف انتقال 3042 - بانک انتقالی را انجام نداده است","dateStr":"08:56 1405/03/02","year":1405,"month":3,"department":"حسابداری","action":"حذف"},{"rowNum":164,"subject":"ارجاع به دیگری: اصلاح وزن دوم","dateStr":"08:53 1405/03/02","year":1405,"month":3,"department":"انبار","action":"ویرایش"},{"rowNum":165,"subject":"ارجاع به دیگری: ثبت موقت رسید دریافت شماره 1014","dateStr":"16:06 1405/02/30","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":166,"subject":"ارجاع به دیگری: حذف سند حسابداری و برگشت از تایید رسید دریافت شماره 216","dateStr":"16:08 1405/02/30","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":167,"subject":"ارجاع به دیگری: برگشت از تایید","dateStr":"15:58 1405/02/30","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":168,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت شماره 2671","dateStr":"15:55 1405/02/30","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":169,"subject":"ارجاع به دیگری: سرویس های روز چهارشنبه 30 اردیبهشت","dateStr":"15:55 1405/02/30","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":170,"subject":"ارجاع به دیگری: حذف مجوز و ترخیص","dateStr":"15:58 1405/02/30","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":171,"subject":"ارجاع به دیگری: حذف مجوز و ترخیص","dateStr":"14:05 1405/02/30","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":172,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای رسول فیروزی","dateStr":"10:47 1405/02/30","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":173,"subject":"ارجاع به دیگری: ثبت وزن دوم","dateStr":"08:32 1405/02/30","year":1405,"month":2,"department":"انبار","action":"ویرایش"},{"rowNum":174,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 1796 ( مورخ 10-01-1405)","dateStr":"08:21 1405/02/30","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":175,"subject":"ارجاع به دیگری: حذف انتقال 197-بانک انتقالی را انجام نداده است","dateStr":"07:23 1405/02/30","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":176,"subject":"ارجاع به دیگری: حذف انتقال 197-بانک انتقالی را انجام نداده است","dateStr":"07:22 1405/02/30","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":177,"subject":"ارجاع به دیگری: در خصوص بررسی بار ارسال شده فرتاک چوب نوین صبوری 1405.1001508","dateStr":"14:31 1405/02/29","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":178,"subject":"ارجاع به دیگری: صورت جلیه حذف سفارش و درخواست پرداخت و اطلاعات دریافت پرداخت به دلیل ویرایش نام تامین کننده","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":179,"subject":"ارجاع به دیگری: صورت جلیه حذف سفارش و درخواست پرداخت و اطلاعات دریافت پرداخت به دلیل ویرایش نام تامین کننده","dateStr":"12:56 1405/02/29","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":180,"subject":"ارجاع به دیگری: برگشت از تایید فاکتور خرید سفارش 141764 +برگشت از تایید فاکتور خرید سفارش 138366","dateStr":"12:50 1405/02/29","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":181,"subject":"ارجاع به دیگری: حذف انتقال 119-بانک انتقالی را انجام نداده است","dateStr":"12:40 1405/02/29","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":182,"subject":"ارجاع به دیگری: حذف شماره درخواست کالا از انبار به شماره 73739","dateStr":"12:38 1405/02/29","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":183,"subject":"ارجاع به دیگری: در خصوص حذف حواله و در حالت ثبت پیش فاکتور  اقای میرزایی","dateStr":"07:58 1405/02/29","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":184,"subject":"ارجاع به دیگری: حذف انتقال 483 -بانک انتقالی را انجام نداده است","dateStr":"07:41 1405/02/29","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":185,"subject":"ارجاع به دیگری: سرویس های روز 28 اردیبهشت","dateStr":"07:24 1405/02/29","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":186,"subject":"ارجاع به دیگری: اطلاعیه فروش لوازم خانگی آتنا مارکت","dateStr":"15:19 1405/02/28","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":187,"subject":"ارجاع به دیگری: ابلاغ دستور مدیریت در خصوص غیبت پرسنل 28 اردیبهشت 1405","dateStr":"12:18 1405/02/28","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":188,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت","dateStr":"08:47 1405/02/28","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":189,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 1599 - جهت شناس شدن رسید دریافت","dateStr":"14:09 1405/02/27","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":190,"subject":"ارجاع به دیگری: تغیر وضعیت پیش فاکتور آقای عباس بیت مرادی","dateStr":"14:10 1405/02/27","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":191,"subject":"ارجاع به دیگری: حذف انتقال 459-465-463- بانک انتقالی ها را انجام نداده است","dateStr":"14:37 1405/02/27","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":192,"subject":"ارجاع به دیگری: حذف درخواست پرداخت و اطلاعات دریافت/پرداخت","dateStr":"10:16 1405/02/27","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":193,"subject":"ارجاع به دیگری: حذف فاکتور خرید","dateStr":"09:20 1405/02/27","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":194,"subject":"ارجاع به دیگری: در خصوص ثبت توزین سیستمی","dateStr":"09:55 1405/02/27","year":1405,"month":2,"department":"انبار","action":"ویرایش"},{"rowNum":195,"subject":"در خصوص حذف اسناد پیش فاکتور برنجی و شیردل","dateStr":"07:49 1405/02/27","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":196,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور شرکت پرویزی تجارت تاج","dateStr":"09:13 1405/02/27","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":197,"subject":"ارجاع به دیگری: در خصوص حذف اسناد پیش فاکتور برنجی و شیردل","dateStr":"15:46 1405/02/26","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":198,"subject":"ارجاع به دیگری: در خصوص حذف حواله 3737 آقای عبدالله چوپان","dateStr":"15:03 1405/02/26","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":199,"subject":"ارجاع به دیگری: درخواست حذف پیوست های سفارش 143618","dateStr":"15:02 1405/02/26","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":200,"subject":"ارجاع به دیگری: حذق سفارش","dateStr":"14:09 1405/02/26","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":201,"subject":"ارجاع به دیگری: صورت اسامی دریافت کنندگان کارت آتنا مارکت","dateStr":"14:09 1405/02/26","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":202,"subject":"ارجاع به دیگری: درخواست حذف پیوست های سفارش 143644","dateStr":"15:01 1405/02/26","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":203,"subject":"ارجاع به دیگری: حذف رسید دریافت 1694","dateStr":"16:14 1405/02/23","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":204,"subject":"ارجاع به دیگری: حذف رسید دریافت 1692","dateStr":"07:24 1405/02/26","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":205,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 159218 و اطلاعات دریافت/پرداخت 152658","dateStr":"12:54 1405/02/23","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":206,"subject":"ارجاع به دیگری: در خصوص در حالت ثبت قرار گرفتن پیش فاکتور کاکایی","dateStr":"12:05 1405/02/23","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":207,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 1710","dateStr":"11:52 1405/02/23","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":208,"subject":"ارجاع به دیگری: ویرایش درخواست خرید 73398","dateStr":"09:31 1405/02/23","year":1405,"month":2,"department":"تدارکات","action":"ویرایش"},{"rowNum":209,"subject":"ارجاع به دیگری: تست ارجاع بعد امضا با پیگیری کننده","dateStr":"09:40 1405/02/23","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":210,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت شماره 1308","dateStr":"16:02 1405/02/22","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":211,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 157769 و اطلاعات دریافت/پرداخت 151183","dateStr":"12:26 1405/02/22","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":212,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت 1694","dateStr":"10:02 1405/02/22","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":213,"subject":"ارجاع به دیگری: درخصوص ویرایش گواهی تامین وجه و حذف رسید دریافت","dateStr":"10:02 1405/02/22","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":214,"subject":"ارجاع به دیگری: حذف انتقال 419 -بانک انتقالی را انجام نداده است","dateStr":"09:25 1405/02/22","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":215,"subject":"ارجاع به دیگری: حذف سفارش","dateStr":"09:25 1405/02/22","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":216,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 22250 ( مورخ 28-12-1404)","dateStr":"16:05 1405/02/21","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":217,"subject":"ارجاع به دیگری: حذف انتقال 192-397 -بانک انتقالی را انجام نداده است","dateStr":"16:08 1405/02/21","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":218,"subject":"ارجاع به دیگری: حذف انتقال 3050- بانک انتقالی را انجام نداده است (25-12-1404)","dateStr":"16:10 1405/02/21","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":219,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 1439","dateStr":"10:06 1405/02/21","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":220,"subject":"ارجاع به دیگری: در خصوص تغییر وضعیت پیش فاکتور آقای غلامحسین معدولیتی","dateStr":"08:51 1405/02/21","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":221,"subject":"ارجاع به دیگری: درخواست حذف و برگشت از تایید","dateStr":"08:12 1405/02/21","year":1405,"month":2,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":222,"subject":"ارجاع به دیگری: تحویل کارت اعتبار آتنا مارکت","dateStr":"16:18 1405/02/20","year":1405,"month":2,"department":"تدارکات","action":"ویرایش"},{"rowNum":223,"subject":"ارجاع به دیگری: در خصوص ویرایش شماره بچ چسب uf","dateStr":"07:27 1405/02/21","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":224,"subject":"ارجاع به دیگری: درخواست حذف و برگشت از تایید","dateStr":"12:57 1405/02/20","year":1405,"month":2,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":225,"subject":"ارجاع به دیگری: درخواست حذف درخواست، سفارش و تحویل","dateStr":"10:24 1405/02/20","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":226,"subject":"ارجاع به دیگری: اصلاح مقدار سفارش","dateStr":"10:32 1405/02/20","year":1405,"month":2,"department":"تدارکات","action":"ویرایش"},{"rowNum":227,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 158579 و اطلاعات دریافت/پرداخت 152004","dateStr":"08:12 1405/02/20","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":228,"subject":"ارجاع به دیگری: حذف اعلامیه بدهکار بستانکار شماره 469 و سند حسابداری شماره 291","dateStr":"12:48 1405/02/19","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":229,"subject":"ارجاع به دیگری: حذف انتقال 3047- بانک انتقالی را انجام نداده است (24-12-1404)","dateStr":"12:51 1405/02/19","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":230,"subject":"ارجاع به دیگری: حذف انتقال 3047- بانک انتقالی را انجام نداده است (24-12-1404)","dateStr":"12:54 1405/02/19","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":231,"subject":"ارجاع به دیگری: حذف درخواست","dateStr":"12:54 1405/02/19","year":1405,"month":2,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":232,"subject":"ارجاع به دیگری: حذف سند انتقال","dateStr":"13:02 1405/02/19","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":233,"subject":"ارجاع به دیگری: صورت جلسه حذف تمامی اسناد درخواست 59274 به دلیل تغییر آیتم های  پیش فاکتور جهت پروژه خ 9 شرقی","dateStr":"13:10 1405/02/19","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":234,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 1393","dateStr":"08:31 1405/02/19","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":235,"subject":"ارجاع به دیگری: حذف هزینه تکمیلی 13515","dateStr":"08:31 1405/02/19","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":236,"subject":"ارجاع به دیگری: لیست پایان خدمت","dateStr":"07:58 1405/02/19","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":237,"subject":"ارجاع به دیگری: حذف هزینه تکمیلی 13515","dateStr":"14:38 1405/02/17","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":238,"subject":"ارجاع به دیگری: حذف پرفروم محمد قاسم کامه وی","dateStr":"14:35 1405/02/16","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":239,"subject":"ارجاع به دیگری: در خصوص درخواست 58689 مربوط به روغن براق کننده چوب و تینر مخصوص","dateStr":"08:24 1405/02/16","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":240,"subject":"ارجاع به دیگری: در خصوص ثبت اشتباه نام تامین کننده","dateStr":"08:47 1405/02/16","year":1405,"month":2,"department":"تدارکات","action":"ویرایش"},{"rowNum":241,"subject":"ارجاع به دیگری: حذف درخواست کالا","dateStr":"09:00 1405/02/16","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":242,"subject":"ارجاع به دیگری: درخواست حذف درخواست کالا از انبار","dateStr":"07:23 1405/02/16","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":243,"subject":"ارجاع به دیگری: حذف انتقال 156-337-340-332 - بانک انتقالی را انجام نداده است","dateStr":"11:49 1405/02/15","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":244,"subject":"ارجاع به دیگری: درخواست حذف سفارش خرید","dateStr":"09:00 1405/02/15","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":245,"subject":"ارجاع به دیگری: در خصوص مجوز و ترخیص","dateStr":"08:58 1405/02/15","year":1405,"month":2,"department":"انبار","action":"ویرایش"},{"rowNum":246,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 158282 و اطلاعات دریافت/پرداخت 151706","dateStr":"08:30 1405/02/15","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":247,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 136005","dateStr":"15:46 1405/02/14","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":248,"subject":"ارجاع به دیگری: حذف انتقال 315- بانک انتقالی را انجام نداده است (13-02-1405)","dateStr":"14:26 1405/02/14","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":249,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 157482 - 157563(مهدی شاکرمی)- بانک از حساب شرکت برداشت نگردیده است ( مورخ 13-02-1405)","dateStr":"15:44 1405/02/14","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":250,"subject":"ارجاع به دیگری: درخواست دسترسی ثبت اعلان","dateStr":"15:46 1405/02/14","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":251,"subject":"ارجاع به دیگری: ثبت موقت رسید دریافت 1222","dateStr":"13:57 1405/02/14","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":252,"subject":"ارجاع به دیگری: حذف درخواست کالا شماره 18534","dateStr":"09:16 1405/02/14","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":253,"subject":"ارجاع به دیگری: حذف درخواست پرداخت157414 و 157415 (به دلیل متوقف شدن سفارش)","dateStr":"08:46 1405/02/14","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":254,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 156833 (صندوق امداد ولایت)- بانک از حساب شرکت برداشت نگردیده است ( مورخ 08-02-1405)","dateStr":"07:38 1405/02/14","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":255,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 157753 (محسن صاحبی پور)- بانک از حساب شرکت برداشت نگردیده است ( مورخ 10-02-1405)","dateStr":"07:37 1405/02/14","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":256,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 157783 (هادی رضایی)- بانک از حساب شرکت برداشت نگردیده است ( مورخ 12-02-1405)","dateStr":"07:38 1405/02/14","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":257,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 157783 (هادی رضایی)- بانک از حساب شرکت برداشت نگردیده است ( مورخ 12-02-1405)","dateStr":"07:34 1405/02/14","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":258,"subject":"ارجاع به دیگری: حضور نمایندگان بانک اقتصاد نوین","dateStr":"07:36 1405/02/14","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":259,"subject":"ارجاع به دیگری: اعلامیه امضاء قرارداد سه ماه اول 1405","dateStr":"07:43 1405/02/14","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":260,"subject":"ارجاع به دیگری: در خصوص تحویل فرم اداری آقایان","dateStr":"16:07 1405/02/13","year":1405,"month":2,"department":"تدارکات","action":"ویرایش"},{"rowNum":261,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور و حذف حواله فرتاک چوب نوین صبوری","dateStr":"08:56 1405/02/13","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":262,"subject":"ارجاع به دیگری: در خصوص حذف سفارش خرید و درخواست کالااچ پی ال آرتاویل","dateStr":"07:34 1405/02/13","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":263,"subject":"ارجاع به دیگری: ثبت موقت رسید دریافت 8201","dateStr":"08:20 1405/02/13","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":264,"subject":"ارجاع به دیگری: حذف مجوز تخلیه وتوزین","dateStr":"08:23 1405/02/13","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":265,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 157502","dateStr":"15:40 1405/02/12","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":266,"subject":"ارجاع به دیگری: حذف مجوز تخلیه وتوزین","dateStr":"15:42 1405/02/12","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":267,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 154139 و اطلاعات دریافت/پرداخت 147420","dateStr":"13:13 1405/02/12","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":268,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 157563 (ابراهیم بیوض پور)- بانک از حساب شرکت برداشت نگردیده است ( مورخ 09-02-1405)","dateStr":"13:21 1405/02/12","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":269,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام شده 157765(حقوق برج 1 تخته- خط) (1 نفر انجام نشده - فاطمه چنانی )- بانک از حساب شرکت کمتر برداشت گردیده بود (09-02-1405)","dateStr":"13:03 1405/02/12","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":270,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت 20679-دستور پرداخت 94204 و درخواست پرداخت 154806","dateStr":"07:46 1405/02/12","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":271,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 154078 و اطلاعات دریافت/پرداخت 147363","dateStr":"07:36 1405/02/12","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":272,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 0439 - جهت شناس شدن رسید دریافت","dateStr":"07:28 1405/02/12","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":273,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام شده(حق ماشین برج 1 پرس- فالیز) (1 نفر انجام نشده محسن صاحبی پور )- بانک از حساب شرکت کمتر برداشت گردیده بود (08-02-1405)","dateStr":"07:36 1405/02/12","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":274,"subject":"ارجاع به دیگری: حذف مجوز تخلیه وتوزین","dateStr":"08:23 1405/02/12","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":275,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای اشکان شماعی سامانی","dateStr":"08:09 1405/02/12","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":276,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای علی گودرزی","dateStr":"08:19 1405/02/12","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":277,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام شده154852(حقوق دکترسالم)- نیاز به تغییر شعبه می باشد","dateStr":"15:48 1405/02/09","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":278,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 157482 (مهدی شاکرمی)- بانک از حساب شرکت برداشت نگردیده است ( مورخ 07-02-1405)","dateStr":"15:22 1405/02/09","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":279,"subject":"ارجاع به دیگری: سرویس های چهارشنبه 9 ادریبهشت 1405","dateStr":"14:57 1405/02/09","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":280,"subject":"ارجاع به دیگری: ثبت موقت شدن رسید دریافت 11922 و حذف سند حسابداری 144037 - کارشناس حسابداری خانم لله گانی مبلغ را اشتباه ثبت کرد","dateStr":"11:02 1405/02/09","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":281,"subject":"ارجاع به دیگری: حذف توزین و مجوز تخلیه","dateStr":"11:02 1405/02/09","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":282,"subject":"ارجاع به دیگری: ثبت موقت درخواست پرداخت 157655","dateStr":"09:18 1405/02/09","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":283,"subject":"ارجاع به دیگری: حذف توزین و مجوز تخلیه","dateStr":"09:26 1405/02/09","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":284,"subject":"ارجاع به دیگری: حذف مجوز تخلیه وتوزین","dateStr":"13:06 1405/02/09","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":285,"subject":"ارجاع به دیگری: اصلاح سفارش وحذف توزین","dateStr":"12:27 1405/02/09","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":286,"subject":"ارجاع به دیگری: در خصوص حذف درخواست کالا و درخواست خرید شرکت آرتاویل","dateStr":"11:03 1405/02/09","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":287,"subject":"ارجاع به دیگری: ثبت موقت شدن رسید دریافت 11922 و حذف سند حسابداری 144037 - کارشناس حسابداری خانم لله گانی مبلغ را اشتباه ثبت کرد","dateStr":"09:15 1405/02/09","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":288,"subject":"ارجاع به دیگری: در خصوص بار مشتری میرات علانظرف","dateStr":"08:28 1405/02/09","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":289,"subject":"ارجاع به دیگری: حذف انتقال 222 - بانک انتقالی را انجام نداده است (06-02-1405)","dateStr":"08:25 1405/02/09","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":290,"subject":"ارجاع به دیگری: حذف سفارش","dateStr":"07:56 1405/02/09","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":291,"subject":"ارجاع به دیگری: اصلاح نرخ ارز فاکتور فروش صادراتی","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":292,"subject":"ارجاع به دیگری: امضا بعد شماره !","dateStr":"20:25 1405/02/08","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":293,"subject":"ارجاع به دیگری: امضا بعد شماره !","dateStr":"07:19 1405/02/09","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":294,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 157482 (مهدی شاکرمی)- بانک از حساب شرکت برداشت نگردیده است ( مورخ 07-02-1405)","dateStr":"12:24 1405/02/08","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":295,"subject":"درخواست بازگشت سفارش به حالت ثبت شده","dateStr":"11:42 1405/02/08","year":1405,"month":2,"department":"تدارکات","action":"ویرایش"},{"rowNum":296,"subject":"ارجاع به دیگری: ثبت هزینه تکمیلی","dateStr":"11:54 1405/02/08","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":297,"subject":"ارجاع به دیگری: پرسنل","dateStr":"12:07 1405/02/08","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":298,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 156027","dateStr":"12:24 1405/02/08","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":299,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 156027","dateStr":"12:21 1405/02/08","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":300,"subject":"ارجاع به دیگری: در خصوص حذف حواله پیش فاکتور آقای درویش خادمی","dateStr":"12:18 1405/02/08","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":301,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 838 - جهت شناس شدن رسید دریافت","dateStr":"12:10 1405/02/08","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":302,"subject":"ارجاع به دیگری: نامه دسترسی","dateStr":"08:30 1405/02/08","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":303,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت شماره 22107","dateStr":"11:36 1405/02/08","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":304,"subject":"ارجاع به دیگری: اصلاح نرخ ارز فاکتور فروش صادراتی","dateStr":"08:55 1405/02/08","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":305,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور هورا چوب جلالی","dateStr":"08:50 1405/02/08","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":306,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای محمدرضا شهبازی","dateStr":"07:59 1405/02/08","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":307,"subject":"امضا بعد شماره !","dateStr":"07:58 1405/02/08","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":308,"subject":"ارجاع به دیگری: درخواست حذف و برگشت از تایید","dateStr":"08:37 1405/02/08","year":1405,"month":2,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":309,"subject":"ارجاع به دیگری: درخواست حذف و برگشت از تایید","dateStr":"08:40 1405/02/08","year":1405,"month":2,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":310,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 799","dateStr":"08:40 1405/02/08","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":311,"subject":"ارجاع به دیگری: در خصوص حذف درخواست کالا","dateStr":"08:22 1405/02/08","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":312,"subject":"ارجاع به دیگری: حذف انتقال 3029- بانک انتقالی را انجام نداده است (23-12-1404)","dateStr":"08:14 1405/02/08","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":313,"subject":"ارجاع به دیگری: حذف درخواست","dateStr":"07:59 1405/02/08","year":1405,"month":2,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":314,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 799","dateStr":"14:32 1405/02/07","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":315,"subject":"ارجاع به دیگری: درخواست بازگشت سفارش به حالت ثبت شده","dateStr":"نامشخص","year":1405,"month":2,"department":"تدارکات","action":"ویرایش"},{"rowNum":316,"subject":"ارجاع به دیگری: درخواست بازگشت سفارش به حالت ثبت شده","dateStr":"14:32 1405/02/07","year":1405,"month":2,"department":"تدارکات","action":"ویرایش"},{"rowNum":317,"subject":"ارجاع به دیگری: سرپرستی فرشید حسینی چمنی - اردیبهشت ماه 1405","dateStr":"نامشخص","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":318,"subject":"ارجاع به دیگری: حذف پیش فاکتور و اسناد مربوطه مشارکت ام دی اف برنجی و شیردل","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":319,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 156127","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":320,"subject":"ارجاع به دیگری: حذف درخواست 156902","dateStr":"نامشخص","year":1405,"month":2,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":321,"subject":"ارجاع به دیگری: حذف سفارش و تحویل","dateStr":"نامشخص","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":322,"subject":"ارجاع به دیگری: درخواست دسترسی","dateStr":"نامشخص","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":323,"subject":"نامه سابقه با استفاده از دکمه عطف به برای نامه شماره 1","dateStr":"14:27 1405/02/06","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":324,"subject":"نامه جدید 2 که پیور نامه شماره 1 است","dateStr":"14:21 1405/02/06","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":325,"subject":"تست A5","dateStr":"14:19 1405/02/06","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":326,"subject":"ارجاع به دیگری: حذف پیش فاکتور و اسناد مربوطه مشارکت ام دی اف برنجی و شیردل","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":327,"subject":"ارجاع به دیگری: ثبت هزینه تکمیلی جهت فاکتور \"ایرانیان پرچم پارس\"","dateStr":"11:56 1405/02/08","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":328,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام نشده(داریوش میرزائی)- بانک از حساب شرکت برداشت نگردیده است (01-02-1405)","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":329,"subject":"ارجاع به دیگری: حذف سند حسابداری و برگشت از تایید رسید دریافت شماره 11699","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":330,"subject":"ارجاع به دیگری: حذف درخواست کالا ازانبار","dateStr":"نامشخص","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":331,"subject":"ارجاع به دیگری: حذف سند عمومی","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":332,"subject":"ارجاع به دیگری: برگشت از سند حسابداری به ثبت موقت رسید دریافت شماره 142","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":333,"subject":"ارجاع به دیگری: حذف انتقال 30 - بانک انتقالی را انجام نداده است (15-01-1405)","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":334,"subject":"ارجاع به دیگری: حذف سند حسابداری و برگشت از تایید رسید دریافت شماره 11699","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":335,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 755","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":336,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 799","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":337,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام شده(حقوق برج 12 پرس- خوزستان)- بانک از حساب شرکت کمتر برداشت گردیده بود (28-12-1404)","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":338,"subject":"ارجاع به دیگری: حذف اسناد","dateStr":"10:37 1405/02/07","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":339,"subject":"ارجاع به دیگری: در خصوص تغییر در صندوق گواهی تامین وجه","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":340,"subject":"ارجاع به دیگری: حذف سفارش","dateStr":"نامشخص","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":341,"subject":"ارجاع به دیگری: در خصوص دسترسی صدور مجوز ورود","dateStr":"نامشخص","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":342,"subject":"ارجاع به دیگری: صورت جلسه حذف تحویل به منظور ویرایش سفارش","dateStr":"نامشخص","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":343,"subject":"ارجاع به دیگری: حذف درخواست پرداختهای متوقف شده","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":344,"subject":"ارجاع به دیگری: پرداخت باقی ماننده قرارداد bi  فروشگاه آنلاین","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":345,"subject":"ارجاع به دیگری: مغایرت وزنی فرمالین مورخ 01/23","dateStr":"نامشخص","year":1405,"month":2,"department":"انبار","action":"ویرایش"},{"rowNum":346,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام شده(حقوق برج 12 پرس- فالیز)- بانک از حساب شرکت کمتر برداشت گردیده بود (28-12-1404)","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":347,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور شرکت پرویزی تجارت تاج","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":348,"subject":"ارجاع به دیگری: حذف حواله و در حالت ثبت قرار دادن پیش فاکتور علی عصار زاده","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":349,"subject":"ارجاع به دیگری: در خصوص تغییر وضعیت و حذف حواله پیش فاکتور شرکت تولیدی و بازرگانی اروین چوب سپهر","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":350,"subject":"ارجاع به دیگری: در خصوص یکسان سازی و خذف حواله و در حالت ثبت قرار گرفتن پیش فاکتور کاتر چوب","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":351,"subject":"ارجاع به دیگری: توزین فرمالین به شماره 82495","dateStr":"نامشخص","year":1405,"month":2,"department":"انبار","action":"ویرایش"},{"rowNum":352,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 755","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":353,"subject":"ارجاع به دیگری: برگشت از تایید به ثبت موقت رسید دریافت شماره766","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":354,"subject":"ارجاع به دیگری: حذف اسناد","dateStr":"11:22 1405/02/05","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":355,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای عباس بیت مرادی","dateStr":"11:23 1405/02/05","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":356,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور و حذف حواله خانم زاده اسکندری ابرزگه","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":357,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای عیسی علوی","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":358,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای ناصر قنبری","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":359,"subject":"گزارش کار 1405/2/2","dateStr":"نامشخص","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":360,"subject":"ارجاع به دیگری: افتتاحیه فروشگاه آتنا مارکت","dateStr":"نامشخص","year":1405,"month":2,"department":"فروش","action":"ویرایش"},{"rowNum":361,"subject":"ارجاع به دیگری: صورتجلسه حذف سفارش 140530 به شماره درخواست 58641","dateStr":"نامشخص","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":362,"subject":"ارجاع به دیگری: صورتجلسه حذف سفارش 140530 به شماره درخواست 58641","dateStr":"نامشخص","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":363,"subject":"ارجاع به دیگری: برگشت از تایید به ثبت موقت رسید دریافت شماره542","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":364,"subject":"ارجاع به دیگری: درخواست تنظیم الگو ( نامه )","dateStr":"نامشخص","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":365,"subject":"تست چند نفر پیوست و ارجاع","dateStr":"15:07 1405/02/01","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":366,"subject":"فرم گزارشات","dateStr":"09:54 1405/02/01","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":367,"subject":"ارجاع به دیگری: تحویل دسترسی سامانه سرو مربوط به شکایات مشتریان","dateStr":"نامشخص","year":1405,"month":2,"department":"تدارکات","action":"ویرایش"},{"rowNum":368,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 157073","dateStr":"09:47 1405/02/01","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":369,"subject":"ارجاع به دیگری: حذف درخواست پرداختهای متوقف شده","dateStr":"08:32 1405/02/01","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":370,"subject":"ارجاع به دیگری: حذف درخواست کالا ازانبار","dateStr":"08:32 1405/02/01","year":1405,"month":2,"department":"انبار","action":"حذف"},{"rowNum":371,"subject":"ارجاع به دیگری: ثبت موقت درخواست پرداخت 157117","dateStr":"16:08 1405/01/31","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":372,"subject":"ارجاع به دیگری: حذف تحویل","dateStr":"13:55 1405/01/31","year":1405,"month":1,"department":"تدارکات","action":"حذف"},{"rowNum":373,"subject":"ارجاع به دیگری: حضور نمایندگان بانک","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":374,"subject":"ارجاع به دیگری: ثبت سیستمی توزین","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"ویرایش"},{"rowNum":375,"subject":"ارجاع به دیگری: ثبت مرخصی - فروردین ماه 1405","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":376,"subject":"ارجاع به دیگری: درخصوص ثبت گواهی تامین وجه","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":377,"subject":"ارجاع به دیگری: پیرو نامه 225269 جهت صورتجلسه حذف سفارش 130206","dateStr":"09:45 1405/01/30","year":1405,"month":1,"department":"تدارکات","action":"حذف"},{"rowNum":378,"subject":"ارجاع به دیگری: درخواست دسترسی راهکاران","dateStr":"09:48 1405/01/30","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":379,"subject":"ارجاع به دیگری: برگشت از سند حسابداری به ثبت موقت رسید دریافت ناشناس 11766","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":380,"subject":"ارجاع به دیگری: درخواست حذف  اعلامیه بدهکار بستانکار شماره 476","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":381,"subject":"ارجاع به دیگری: حذف  دستور پرداخت و درخواست پرداخت انجام نشده (محمد نبی کارچانی)- بانک از حساب شرکت برداشت نگردیده است (24-01-1405)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":382,"subject":"ارجاع به دیگری: حذف  دستور پرداخت و درخواست پرداخت انجام نشده (هادی شمیلی)- بانک از حساب شرکت برداشت نگردیده است (24-01-1405)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":383,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 157007 و اطلاعات دریافت/پرداخت 150386","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":384,"subject":"ارجاع به دیگری: درخواست حذف اسناد","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":385,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 283","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":386,"subject":"ارجاع به دیگری: ترک کار","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":387,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده (هادی شمیلی)- بانک از حساب شرکت برداشت نگردیده است (24-01-1405)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":388,"subject":"ارجاع به دیگری: حذف درخواست کالا","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"حذف"},{"rowNum":389,"subject":"ارجاع به دیگری: صورتجلسه حذف سند هزینه تکمیلی12738","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":390,"subject":"ارجاع به دیگری: در خصوص گزارش ضایعات خط آغشته","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"ویرایش"},{"rowNum":391,"subject":"ارجاع به دیگری: صورتجلسه حذف هزینه تکمیلی12841","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":392,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده (هادی شمیلی)- بانک از حساب شرکت برداشت نگردیده است (24-01-1405)","dateStr":"15:01 1405/01/26","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":393,"subject":"ارجاع به دیگری: برگشت از تایید به ثبت موقت رسید دریافت شماره 227","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":394,"subject":"ارجاع به دیگری: حذف سند پرداخت","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":395,"subject":"ارجاع به دیگری: ویرایش تاریخ صورت خلاصه تنخواه به شماره 5856","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":396,"subject":"ارجاع به دیگری: ویرایش تاریخ صورت خلاصه تنخواه به شماره 5856","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":397,"subject":"ارجاع به دیگری: حذف فاکتور خرید","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":398,"subject":"ارجاع به دیگری: دسترسی های مورد نیاز","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":399,"subject":"ارجاع به دیگری: افتتاح حساب در بانک ملت و بانک اقتصاد نوین","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":400,"subject":"ارجاع به دیگری: حذف درخواست کالا","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"حذف"},{"rowNum":401,"subject":"ارجاع به دیگری: حذف حواله و پیش فاکتور آقای محسن باجی(ضایعات)","dateStr":"13:58 1405/02/28","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":402,"subject":"ارجاع به دیگری: دسترسی واحد قانونی خانم پروین مرادی سبزکوهی","dateStr":"نامشخص","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":403,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام نشده(صادق سنگوری)- بانک از حساب شرکت برداشت نگردیده است (23-12-1404)","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":404,"subject":"ارجاع به دیگری: ثبت موقت شدن رسید دریافت 22- خطای سیستمی نامعتبربودن نرخ ارز رسید دریافت 22","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":405,"subject":"ارجاع به دیگری: ثبت موقت شدن رسید دریافت 22- خطای سیستمی نامعتبربودن نرخ ارز رسید دریافت 22","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":406,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام نشده(صندوق امداد ولایت)- بانک از حساب شرکت برداشت نگردیده است (23-01-1405)","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":407,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (23-01-1405)","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":408,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام نشده(علیرضا عیاشی)- بانک از حساب شرکت برداشت نگردیده است (23-01-1405)","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"ویرایش"},{"rowNum":409,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام نشده(صادق سنگوری)- بانک از حساب شرکت برداشت نگردیده است (23-12-1404)","dateStr":"11:59 1405/01/24","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":410,"subject":"ارجاع به دیگری: استرداد عرفان گستر چوب ایرانیان - 991113/55","dateStr":"09:08 1405/01/24","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":411,"subject":"ارجاع به دیگری: حذف فاکتور خرید","dateStr":"09:08 1405/01/24","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":412,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت کمتر انجام شده نعمت الله زارع خفری- بانک از حساب شرکت برداشت نگردیده است (19-12-1404)","dateStr":"09:35 1405/01/24","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":413,"subject":"ارجاع به دیگری: ثبت موقت درخواست پرداخت 156843","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":414,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 156856-156855-(بانک به جای برداشت از شعبه آغشته از حساب پرس برداشت کرد)","dateStr":"09:36 1405/01/24","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":415,"subject":"ارجاع به دیگری: سرویس های روز یک شنبه 23 فروردین 1405","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":416,"subject":"ارجاع به دیگری: اطلاعیه ثبت ورود و خروج - 23 فروردین ماه 1405","dateStr":"12:19 1405/01/23","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":417,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (19-01-1405)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":418,"subject":"ارجاع به دیگری: تغییر وضعیت هزینه های تکمیلی جهت تعریف طرف مقابل","dateStr":"12:19 1405/01/23","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":419,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور پارکت","dateStr":"نامشخص","year":1405,"month":1,"department":"فروش","action":"ویرایش"},{"rowNum":420,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای محسن باجی(ضایعات)","dateStr":"09:08 1405/01/24","year":1405,"month":1,"department":"فروش","action":"ویرایش"},{"rowNum":421,"subject":"ارجاع به دیگری: پیرو نامه 225269 جهت صورتجلسه حذف سفارش 130206","dateStr":"نامشخص","year":1405,"month":1,"department":"تدارکات","action":"حذف"},{"rowNum":422,"subject":"ارجاع به دیگری: درخواست دسترسی در سیستم راهکاران","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":423,"subject":"ارجاع به دیگری: حذف حواله و در حالت ثبت قرار دادن پیش فاکتور اقای علی بهاری","dateStr":"09:54 1405/01/22","year":1405,"month":1,"department":"فروش","action":"حذف"},{"rowNum":424,"subject":"ارجاع به دیگری: حذف مجوز بارگیری و ترخیص","dateStr":"09:50 1405/01/22","year":1405,"month":1,"department":"انبار","action":"حذف"},{"rowNum":425,"subject":"ارجاع به دیگری: حذف مجوز و ترخیص","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"حذف"},{"rowNum":426,"subject":"ارجاع به دیگری: حذف فاکتور خرید","dateStr":"07:33 1405/01/22","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":427,"subject":"فعال کردن راهکاران","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":428,"subject":"ارجاع به دیگری: حذف مجوز و ترخیص","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"حذف"},{"rowNum":429,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 71","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":430,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت کمتر انجام شده- بانک از حساب شرکت برداشت نگردیده است (18-01-1404)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":431,"subject":"ارجاع به دیگری: ثبت موقت درخواست پرداخت 156599-156656","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":432,"subject":"ارجاع به دیگری: ثبت سیستمی توزین","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"ویرایش"},{"rowNum":433,"subject":"ارجاع به دیگری: حذف سفارش و تحویل","dateStr":"نامشخص","year":1405,"month":1,"department":"تدارکات","action":"حذف"},{"rowNum":434,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (24-12-1404)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":435,"subject":"ارجاع به دیگری: ثبت باسکول چسب uf","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"ویرایش"},{"rowNum":436,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت 154817 -(بانک به جای برداشت از شعبه کابینت از حساب پرس برداشت کرد)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":437,"subject":"ارجاع به دیگری: درخواست حذف شماره سفارش و تحویل","dateStr":"نامشخص","year":1405,"month":1,"department":"تدارکات","action":"حذف"},{"rowNum":438,"subject":"ارجاع به دیگری: حذف رسید دریافت شماره 11899 + 11909","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":439,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (17-01-1405)","dateStr":"12:25 1405/01/18","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":440,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (17-01-1405)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":441,"subject":"ارجاع به دیگری: صورت جلسه حذف تحویل و فاکتور به دلیل اشتباه ثبت شدن مبلغ در سفارش","dateStr":"نامشخص","year":1405,"month":1,"department":"تدارکات","action":"حذف"},{"rowNum":442,"subject":"ارجاع به دیگری: درخواست حذف","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":443,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آریا تبریز چوب آروند","dateStr":"نامشخص","year":1405,"month":1,"department":"فروش","action":"ویرایش"},{"rowNum":444,"subject":"ارجاع به دیگری: تغییر وضعیت و حذف حواله پیش فاکتور (ضایعات)","dateStr":"نامشخص","year":1405,"month":1,"department":"فروش","action":"حذف"},{"rowNum":445,"subject":"ارجاع به دیگری: تغییر وضعیت و حذف حواله پیش فاکتور آقای محسن باجی(ضایعات)","dateStr":"14:03 1405/02/28","year":1405,"month":2,"department":"فروش","action":"حذف"},{"rowNum":446,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (28-12-1404)","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":447,"subject":"ارجاع به دیگری: صورت جلسه حذف تحویل و فاکتور به دلیل اشتباه ثبت شدن مبلغ در سفارش","dateStr":"نامشخص","year":1405,"month":2,"department":"تدارکات","action":"حذف"},{"rowNum":448,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (28-12-1404)","dateStr":"نامشخص","year":1405,"month":2,"department":"حسابداری","action":"حذف"},{"rowNum":449,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام نشده(حمید رضائی)- بانک از حساب شرکت برداشت نگردیده است (28-12-1404)","dateStr":"07:22 1405/01/18","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":450,"subject":"تست سابقه / مقابل جدید","dateStr":"14:52 1405/02/08","year":1405,"month":2,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":451,"subject":"تست سابقه / مقابل جدید","dateStr":"09:09 1405/01/24","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":452,"subject":"ارجاع به دیگری: حذف سند حسابداری شماره 140732","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":453,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 9 + 12","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":454,"subject":"ارجاع به دیگری: حذف فرایند تخلیه","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"حذف"},{"rowNum":455,"subject":"ارجاع به دیگری: صورت جلسه حذف تحویل و فاکتور به دلیل اشتباه ثبت شدن مبلغ در سفارش","dateStr":"نامشخص","year":1405,"month":1,"department":"تدارکات","action":"حذف"},{"rowNum":456,"subject":"ارجاع به دیگری: سرویس های 16 فروردین 1405","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":457,"subject":"ارجاع به دیگری: دسترسی به اقلام جاری","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":458,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (27-12-1404)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":459,"subject":"ارجاع به دیگری: مرخصی های پرسنل اداری با تایید مدیرعامل 15 فروردین 1405","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":460,"subject":"ارجاع به دیگری: ثبت باسکول چسب uf","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"ویرایش"},{"rowNum":461,"subject":"ارجاع به دیگری: حذف فاکتور خرید","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":462,"subject":"ارجاع به دیگری: درخواست دسترسی خانم دانائی پور به سیستم راهکاران","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":463,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 11865","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":464,"subject":"ارجاع به دیگری: دسترسی به گردش کار رسید دریافت","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":465,"subject":"ارجاع به دیگری: درخصوص ایجاد گروه گیرندگان واحد جاری","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":466,"subject":"ارجاع به دیگری: جا به جایی خانم پروین مرادی 15 فروردین 1405","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":467,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (27-12-1404)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":468,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (28-12-1404)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":469,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (10-01-1405)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":470,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (24-12-1404)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":471,"subject":"ارجاع به دیگری: اصلاح سند انبار","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"ویرایش"},{"rowNum":472,"subject":"ارجاع به دیگری: صورتجلسه حذف هزینه تکمیلی12841","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":473,"subject":"ارجاع به دیگری: حذف حواله و در حالت ثبت قرار دادن پیش فاکتور ارین صفحه مهدی سربیشه","dateStr":"نامشخص","year":1405,"month":1,"department":"فروش","action":"حذف"},{"rowNum":474,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 144624","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":475,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 3 و 4","dateStr":"07:21 1405/01/16","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":476,"subject":"ارجاع به دیگری: جا به جایی خانم پروین مرادی 15 فروردین 1405","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":477,"subject":"ارجاع به دیگری: حذف حواله و در حالت ثبت قرار دادن پیش فاکتور","dateStr":"نامشخص","year":1405,"month":1,"department":"فروش","action":"حذف"},{"rowNum":478,"subject":"ارجاع به دیگری: درخواست حذف درخواست کالا 69314 و مراحل آن","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"حذف"},{"rowNum":479,"subject":"ارجاع به دیگری: درخصوص خطای تاریخ بهای تمام شده","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":480,"subject":"ارجاع به دیگری: در خصوص حذف حواله و در حالت ثبت قراردادن پیش فاکتور آقای محمد دادگر عیلام در سال 1405","dateStr":"نامشخص","year":1405,"month":1,"department":"فروش","action":"حذف"},{"rowNum":481,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتورهای صفحه کابینت","dateStr":"نامشخص","year":1405,"month":1,"department":"فروش","action":"ویرایش"},{"rowNum":482,"subject":"ارجاع به دیگری: پیرو نامه 225269 جهت صورتجلسه حذف سفارش 130206","dateStr":"نامشخص","year":1405,"month":1,"department":"تدارکات","action":"حذف"},{"rowNum":483,"subject":"ارجاع به دیگری: فعالسازی دسترسی جهت خانم هنا گیم اهواز و خانم زهرا کرد زنگنه","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":484,"subject":"ارجاع به دیگری: ثبت سیستمی توزینها","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"ویرایش"},{"rowNum":485,"subject":"ارجاع به دیگری: حذف فرایند تخلیه","dateStr":"نامشخص","year":1405,"month":1,"department":"انبار","action":"حذف"},{"rowNum":486,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت پاداش مدیریت تخته 156173 -  1404/12/27-بانک از حساب شرکت کمتر برداشت گردیده است","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":487,"subject":"ارجاع به دیگری: حذف پیش فاکتور و اسناد","dateStr":"نامشخص","year":1404,"month":12,"department":"فروش","action":"حذف"},{"rowNum":488,"subject":"ارجاع به دیگری: حذف فرایند تخلیه","dateStr":"12:37 1405/04/10","year":1405,"month":4,"department":"انبار","action":"حذف"},{"rowNum":489,"subject":"ث2ث","dateStr":"09:09 1405/01/24","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":490,"subject":"تست قالب جدید","dateStr":"19:09 1405/01/07","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":491,"subject":"تست قالب جدید","dateStr":"19:09 1405/01/07","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":492,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 156240 و 156421","dateStr":"12:06 1405/01/04","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":493,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت پاداش مدیریت پرس 156171 -  1404/12/27-بانک از حساب شرکت کمتر برداشت گردیده است","dateStr":"12:06 1405/01/04","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":494,"subject":"ارجاع به دیگری: انتقال بین حساب جهت پرداخت مالیات حقوق  بهمن ماه 1404 پرسنل شرکت  نوین چوب خوزستان","dateStr":"12:06 1405/01/04","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":495,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت انجام نشده(حیاتقلی موسوی)- بانک از حساب شرکت برداشت نگردیده است (27-12-1404)","dateStr":"12:07 1405/01/04","year":1405,"month":1,"department":"حسابداری","action":"ویرایش"},{"rowNum":496,"subject":"ارجاع به دیگری: حذف  دستور پرداخت های انجام نشده - بانک از حساب شرکت برداشت نگردیده است (25-12-1404)","dateStr":"07:34 1405/01/09","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":497,"subject":"ارجاع به دیگری: سرویس های روز چهارشنبه 27 اسفند","dateStr":"نامشخص","year":1405,"month":1,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":498,"subject":"ارجاع به دیگری: حذف  دستور پرداخت های انجام نشده - بانک از حساب شرکت برداشت نگردیده است (26-12-1404)","dateStr":"نامشخص","year":1405,"month":1,"department":"حسابداری","action":"حذف"},{"rowNum":499,"subject":"ارجاع به دیگری: ویرایش هزینه تکمیلی","dateStr":"20:26 1404/12/27","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":500,"subject":"ارجاع به دیگری: حذف  دستور پرداخت  انجام نشده - بانک از حساب شرکت برداشت نگردیده است (حساب ملی)","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":501,"subject":"ارجاع به دیگری: حذف  دستور پرداخت های انجام نشده - بانک از حساب شرکت برداشت نگردیده است (26-12-1404)","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":502,"subject":"ارجاع به دیگری: صورت جلسه حذف هزینه تکمیلی به شماره 13123","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":503,"subject":"ارجاع به دیگری: صورت جلسه حذف هزینه تکمیلی به شماره 13123","dateStr":"20:26 1404/12/27","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":504,"subject":"ارجاع به دیگری: حذف  دستور پرداخت های انجام نشده - بانک از حساب شرکت برداشت نگردیده است (25-12-1404)","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":505,"subject":"ارجاع به دیگری: حذف  دستور پرداخت انجام نشده - بانک از حساب شرکت برداشت نگردیده است (24-12-1404)","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":506,"subject":"ارجاع به دیگری: حذف  دستور پرداخت  انجام نشده - بانک از حساب شرکت برداشت نگردیده است (حساب ملی)","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":507,"subject":"ارجاع به دیگری: حذف  دستور پرداخت  انجام نشده 94665- بانک از حساب شرکت برداشت نگردیده است (حساب ملی)","dateStr":"12:04 1404/12/27","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":508,"subject":"ارجاع به دیگری: حذف  دستور پرداخت های انجام نشده در نامه- بانک از حساب شرکت برداشت نگردیده است (حساب ملی)","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":509,"subject":"ارجاع به دیگری: حذف  دستور پرداخت های انجام نشده در نامه- بانک از حساب شرکت برداشت نگردیده است (حساب ملی)","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":510,"subject":"ارجاع به دیگری: حذف  دستور پرداخت  انجام نشده 94665- بانک از حساب شرکت برداشت نگردیده است (حساب ملی)","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":511,"subject":"ارجاع به دیگری: فعالسازی دسترسی جهت خانم هنا گیم اهواز و خانم زهرا کرد زنگنه","dateStr":"نامشخص","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":512,"subject":"ارجاع به دیگری: ثبت توزین ماشین حمل فرمالین","dateStr":"نامشخص","year":1404,"month":12,"department":"انبار","action":"ویرایش"},{"rowNum":513,"subject":"ارجاع به دیگری: ثبت توزین","dateStr":"نامشخص","year":1404,"month":12,"department":"انبار","action":"ویرایش"},{"rowNum":514,"subject":"ارجاع به دیگری: حذف  دستور پرداخت های انجام نشده در نامه- بانک از حساب شرکت برداشت نگردیده است (حساب ملی)","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":515,"subject":"ارجاع به دیگری: حذف دستور پرداخت انجام نشده 94779-94761-94788 مورخ 1404/12/26-- بانک از حساب شرکت برداشت نگردیده است","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":516,"subject":"ارجاع به دیگری: حذف دستور پرداخت انجام نشده 94911-94912 مورخ 1404/12/26-- بانک از حساب شرکت برداشت نگردیده است","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":517,"subject":"ارجاع به دیگری: حذف دستور پرداخت انجام نشده 94779-94761-94788 مورخ 1404/12/26-- بانک از حساب شرکت برداشت نگردیده است","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":518,"subject":"ارجاع به دیگری: صورتجلسه حذف هزینه تکمیلی12841","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":519,"subject":"ارجاع به دیگری: حذف تحویل 155748 و 155746","dateStr":"نامشخص","year":1404,"month":12,"department":"تدارکات","action":"حذف"},{"rowNum":520,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت پایان خدمت تخته فشرده 156064 مورخ 1404/12/25-- بانک از حساب شرکت کمتر برداشت گردیده است","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":521,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت پایان خدمت صفحه کابینت 156061 مورخ 1404/12/25-- بانک از حساب شرکت کمتر برداشت گردیده است","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":522,"subject":"ارجاع به دیگری: در خصوص آمارگیر واحد آغشته","dateStr":"نامشخص","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":523,"subject":"ارجاع به دیگری: حذف سند فاکتور خرید و تحویل","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":524,"subject":"22222","dateStr":"11:38 1404/12/26","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":525,"subject":"ارجاع به دیگری: حذف حواله و در حالت ثبت قرار دادن پیش فاکتور اقای علی بهاری","dateStr":"نامشخص","year":1404,"month":12,"department":"فروش","action":"حذف"},{"rowNum":526,"subject":"ارجاع به دیگری: در خصوص تغییر وضعیت   پیش فاکتور مشارکت داوود یوسفیان قهفرخی و رضا یوسفیان قهفرخی","dateStr":"07:23 1404/12/26","year":1404,"month":12,"department":"فروش","action":"ویرایش"},{"rowNum":527,"subject":"ارجاع به دیگری: ویرایش شماره فاکتورخرید","dateStr":"نامشخص","year":1404,"month":12,"department":"تدارکات","action":"ویرایش"},{"rowNum":528,"subject":"ارجاع به دیگری: در خصوص تغییر وضعیت پیش فاکتور دایان (پارکت)","dateStr":"نامشخص","year":1404,"month":12,"department":"فروش","action":"ویرایش"},{"rowNum":529,"subject":"ارجاع به دیگری: سرویس های روز دوشنبه 25 اسفند","dateStr":"نامشخص","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":530,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت های انجام نشده 154257- 155426-154693-154900-154893-155263-155331- بانک از حساب شرکت برداشت نگردیده است (حساب سپه)","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":531,"subject":"ارجاع به دیگری: در خصوص تغییر وضعیت پیش فاکتور دایان (پارکت)","dateStr":"14:34 1404/12/25","year":1404,"month":12,"department":"فروش","action":"ویرایش"},{"rowNum":532,"subject":"تست...","dateStr":"12:01 1404/12/25","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":533,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت های انجام نشده 154689- 154326-153962 - بانک از حساب شرکت برداشت نگردیده است (حساب سپه)","dateStr":"12:06 1404/12/25","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":534,"subject":"ارجاع به دیگری: در خصوص تغییر وضعیت پیش فاکتور علی محمدیان عسلویه جم","dateStr":"نامشخص","year":1404,"month":12,"department":"فروش","action":"ویرایش"},{"rowNum":535,"subject":"ارجاع به دیگری: حذف درخواست ، سفارش و تحویل","dateStr":"11:29 1404/12/25","year":1404,"month":12,"department":"تدارکات","action":"حذف"},{"rowNum":536,"subject":"ارجاع به دیگری: درخصوص درخواست قالب نامه واحد مطالبات","dateStr":"15:02 1404/12/25","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":537,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور بلوط زرین اسپادانا","dateStr":"12:43 1404/12/19","year":1404,"month":12,"department":"فروش","action":"ویرایش"},{"rowNum":538,"subject":"ارجاع به دیگری: ثبت موقت شدن درخواست پرداخت پاداش مدیریت صفحه کابینت 154541مورخ 1404/12/06-- بانک از حساب شرکت کمتر برداشت گردیده است","dateStr":"09:59 1404/12/19","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":539,"subject":"ارجاع به دیگری: حذف دستور پرداخت انجام نشده 94041-مورخ 1404/12/06-- بانک از حساب شرکت برداشت نگردیده است","dateStr":"08:37 1404/12/19","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":540,"subject":"ارجاع به دیگری: در خصوص حذف وصول/واخواست","dateStr":"07:49 1404/12/19","year":1404,"month":12,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":541,"subject":"ارجاع به دیگری: و","dateStr":"11:30 1404/12/17","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":542,"subject":"ارجاع به دیگری: درخصوص ثبت وزن اول ودوم","dateStr":"11:19 1404/12/09","year":1404,"month":12,"department":"انبار","action":"ویرایش"},{"rowNum":543,"subject":"ارجاع به دیگری: در خصوص ثبت تحویل بار فرمالین مورخ 20 / 11 /1404","dateStr":"11:24 1404/12/09","year":1404,"month":12,"department":"تدارکات","action":"ویرایش"},{"rowNum":544,"subject":"ارجاع به دیگری: درخواست پروفایل راهکاران","dateStr":"11:26 1404/12/09","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":545,"subject":"ارجاع به دیگری: بدون عنوان","dateStr":"10:43 1404/12/09","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":546,"subject":"ارجاع به دیگری: بدون عنوان","dateStr":"11:23 1404/12/09","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":547,"subject":"ارجاع به دیگری: درخصوص ایجاد گروه گیرندگان واحد جاری","dateStr":"08:25 1404/12/19","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":548,"subject":"ارجاع به دیگری: تغییر وضعیت پیش فاکتور آقای اسماعیل جعفری نژاد","dateStr":"10:12 1404/12/09","year":1404,"month":12,"department":"فروش","action":"ویرایش"},{"rowNum":549,"subject":"ارجاع به دیگری: حذف دستور پرداخت های انجام نشده توسط بانک","dateStr":"11:29 1404/12/09","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":550,"subject":"ارجاع به دیگری: حذف سفارش و تحویل","dateStr":"11:51 1404/12/09","year":1404,"month":12,"department":"تدارکات","action":"حذف"},{"rowNum":551,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت 4906","dateStr":"09:23 1404/12/19","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":552,"subject":"ارجاع به دیگری: در خصوص ثبت تحویل بار فرمالین مورخ 20 / 11 /1404","dateStr":"12:02 1404/12/09","year":1404,"month":12,"department":"تدارکات","action":"ویرایش"},{"rowNum":553,"subject":"ارجاع به دیگری: دسترسی به راهکاران سیستم","dateStr":"12:02 1404/12/09","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":554,"subject":"ارجاع به دیگری: درخواست حذف پیوست","dateStr":"12:02 1404/12/09","year":1404,"month":12,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":555,"subject":"ارجاع به دیگری: حذف سند حسابداری ‎130879‏","dateStr":"12:14 1404/12/09","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":556,"subject":"ارجاع به دیگری: حذف فرایند تخلیه","dateStr":"08:02 1404/12/19","year":1404,"month":12,"department":"انبار","action":"حذف"},{"rowNum":557,"subject":"ارجاع به دیگری: پرینت","dateStr":"12:09 1404/12/05","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":558,"subject":"ارجاع به دیگری: پرینت","dateStr":"12:07 1404/12/05","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":559,"subject":"ارجاع به دیگری: درخواست حذف اعلامیه پرداخت","dateStr":"10:33 1404/12/05","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":560,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 154098 و اطلاعات دریافت/پرداخت 147379","dateStr":"09:29 1404/12/19","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":561,"subject":"ارجاع به دیگری: صورتجلسه حذف سفارش 137962 ( درخواست صحیح 58110 )","dateStr":"08:31 1404/12/17","year":1404,"month":12,"department":"تدارکات","action":"حذف"},{"rowNum":562,"subject":"ارجاع به دیگری: حذف دستور پرداخت 93521","dateStr":"07:24 1404/12/05","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":563,"subject":"ارجاع به دیگری: سرویس های روز دوشنبه 4 اسفند","dateStr":"08:19 1404/12/05","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":564,"subject":"تست 10","dateStr":"15:30 1404/12/04","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":565,"subject":"ارجاع به دیگری: در خصوص دسترسی راهکاران","dateStr":"08:15 1404/12/19","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":566,"subject":"نامه تست گیرنده","dateStr":"13:14 1404/12/04","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":567,"subject":"نامه تست گیرنده","dateStr":"12:56 1404/12/04","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":568,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت - 11394","dateStr":"15:35 1404/12/04","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":569,"subject":"ارجاع به دیگری: حذف دستور پرداخت 93612 و 93630","dateStr":"07:28 1404/12/05","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":570,"subject":"تست","dateStr":"11:50 1404/12/04","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":571,"subject":"ارجاع به دیگری: حذف دستور پرداخت انجام نشده 93611 -93661  مورخ 1404/12/03-- بانک از حساب شرکت برداشت نگردیده است","dateStr":"07:59 1404/12/05","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":572,"subject":"ارجاع به دیگری: برگشت از تایید به ثبت موقت رسید دریافت 11467","dateStr":"15:54 1404/12/04","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":573,"subject":"ارجاع به دیگری: سسسس","dateStr":"08:19 1404/12/05","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":574,"subject":"ارجاع به دیگری: سسسس","dateStr":"نامشخص","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":575,"subject":"سسسس","dateStr":"15:25 1404/12/04","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":576,"subject":"ارجاع به دیگری: سرویس های روز یک شنبه 1404/12/03","dateStr":"08:19 1404/12/05","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":577,"subject":"ارجاع به دیگری: در خصوص تغییر وضعیت پیش فاکتور اقای مجید خسروی و حذف حواله","dateStr":"08:20 1404/12/05","year":1404,"month":12,"department":"فروش","action":"حذف"},{"rowNum":578,"subject":"ارجاع به دیگری: در خصوص تغییر وضعیت پیش فاکتور اقای مجید خسروی و حذف حواله","dateStr":"08:26 1404/12/19","year":1404,"month":12,"department":"فروش","action":"حذف"},{"rowNum":579,"subject":"ارجاع به دیگری: توزین فرمالین به شماره 79569","dateStr":"09:53 1404/12/19","year":1404,"month":12,"department":"انبار","action":"ویرایش"},{"rowNum":580,"subject":"تتت","dateStr":"12:47 1404/12/03","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":581,"subject":"ارجاع به دیگری: در خصوص اشتغال به کار در فروشگاه حسینیه","dateStr":"12:54 1404/12/03","year":1404,"month":12,"department":"فروش","action":"ویرایش"},{"rowNum":582,"subject":"ارجاع به دیگری: بررسی ماژول پیمانکاران جهت صدور درخواست پرداخت","dateStr":"08:59 1404/12/19","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":583,"subject":"ارجاع به دیگری: حذف سند رسید دریافت 94564","dateStr":"08:50 1404/12/05","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":584,"subject":"ارجاع به دیگری: حذف سند رسید دریافت 94564","dateStr":"08:31 1404/12/17","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":585,"subject":"تست ارجاع بعد از امضاع","dateStr":"11:30 1404/12/03","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":586,"subject":"ارجاع به دیگری: درخواست ویرایش درخواست پرداخت","dateStr":"11:51 1404/12/03","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":587,"subject":"تست امضا بعد از ارجاع","dateStr":"11:06 1404/12/03","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":588,"subject":"تست ارجاع بعد امضا - ارجاع دوم  2_گیرنده یک و امضا:متین","dateStr":"10:57 1404/12/03","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":589,"subject":"تست ارجاع بعداز امضا_ارجاع دوم","dateStr":"10:34 1404/12/03","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":590,"subject":"تست ارجاع بعد امضا با پیگیری کننده","dateStr":"10:27 1404/12/03","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":591,"subject":"تست ارجاع بعد از امضا","dateStr":"08:29 1404/12/19","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":592,"subject":"تست ارجاع بعد از امضا","dateStr":"نامشخص","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":593,"subject":"تست ارجاع بعد از امضا","dateStr":"نامشخص","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":594,"subject":"ارجاع به دیگری: برگشت از تایید رسید دریافت شماره 11439","dateStr":"08:25 1404/12/03","year":1404,"month":12,"department":"حسابداری","action":"ویرایش"},{"rowNum":595,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت  19559و 19576","dateStr":"14:25 1404/12/05","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":596,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت  19559و 19576","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":597,"subject":"ارجاع به دیگری: حذف انتقال 2918-2917-2919-2916 بانک انتقالی ها را انجام نداده است -","dateStr":"نامشخص","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":598,"subject":"ارجاع به دیگری: درخصوص تغییر وضعیت پیش فاکتور هایگلاس فرتاک چوب نوین صبوری","dateStr":"13:29 1404/12/03","year":1404,"month":12,"department":"فروش","action":"ویرایش"},{"rowNum":599,"subject":"ارجاع به دیگری: حذف درخواست پرداخت 153557 و اطلاعات دریافت/پرداخت 146808","dateStr":"14:21 1404/12/03","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":600,"subject":"ارجاع به دیگری: بدون عنوان","dateStr":"07:19 1404/12/03","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":601,"subject":"ارجاع به دیگری: حذف اعلامیه پرداخت  19559و 19576","dateStr":"07:24 1404/12/03","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":602,"subject":"ارجاع به دیگری: حذف انتقال 2882 بانک انتقالی ها را انجام نداده است - جهت آقای آقاجری","dateStr":"09:53 1404/12/19","year":1404,"month":12,"department":"حسابداری","action":"حذف"},{"rowNum":603,"subject":"ارجاع به دیگری: درخواست مرخصی","dateStr":"09:04 1404/12/03","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":604,"subject":"پاسخ به: تست ترتیبی1","dateStr":"09:08 1404/12/03","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":605,"subject":"تست زمان بندی","dateStr":"09:14 1404/12/02","year":1404,"month":12,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":606,"subject":"تست زمان بندی","dateStr":"15:45 1404/11/29","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":607,"subject":"مرخصی","dateStr":"10:33 1404/11/29","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":608,"subject":"تست پیام","dateStr":"10:24 1404/11/29","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":609,"subject":"درخواست مرخصی 3","dateStr":"10:08 1404/11/29","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":610,"subject":"درخواست ثبت اولیه","dateStr":"23:39 1404/11/28","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":611,"subject":"حذف دستور چرداخت","dateStr":"07:51 1404/11/29","year":1404,"month":11,"department":"سایر / نامشخص","action":"حذف"},{"rowNum":612,"subject":"درخواست مرخصی","dateStr":"15:44 1404/11/29","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":613,"subject":"نامه","dateStr":"13:20 1404/11/28","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":614,"subject":"تست","dateStr":"13:19 1404/11/28","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":615,"subject":"حذف دستور پرداخت 3323","dateStr":"13:18 1404/11/28","year":1404,"month":11,"department":"حسابداری","action":"حذف"},{"rowNum":616,"subject":"اعلام ساعت","dateStr":"07:29 1404/11/28","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":617,"subject":"اعلام ساعت","dateStr":"07:31 1404/11/28","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":618,"subject":"پاسخ به: درخواست مرخصی","dateStr":"07:31 1404/11/28","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":619,"subject":"پاسخ به: تست","dateStr":"07:53 1404/11/29","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":620,"subject":"پاسخ به: تست ارجاع مخفی و جهت","dateStr":"07:53 1404/11/29","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":621,"subject":"تست","dateStr":"14:42 1404/11/27","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":622,"subject":"پیرو تست ارجاع مخفی و جهت","dateStr":"13:07 1404/11/27","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":623,"subject":"ارجاع به دیگری: تست ارجاع مخفی و جهت","dateStr":"10:38 1404/11/29","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":624,"subject":"ارجاع به دیگری: تست ارجاع مخفی و جهت","dateStr":"15:08 1404/11/29","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":625,"subject":"ارجاع به دیگری: تست ارجاع مخفی و جهت","dateStr":"11:59 1404/11/27","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":626,"subject":"تست ارجاع مخفی و جهت","dateStr":"11:53 1404/11/27","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":627,"subject":"تست شتابگر","dateStr":"10:30 1404/11/27","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":628,"subject":"ارجاع به دیگری: درخواست مرخصی اصلاح گردد","dateStr":"09:26 1404/11/27","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"},{"rowNum":629,"subject":"درخواست مرخصی اصلاح گردد","dateStr":"09:04 1404/11/27","year":1404,"month":11,"department":"سایر / نامشخص","action":"ویرایش"}];
+
+        // Months translation helper
+        const persianMonths = {
+            1: 'فروردین', 2: 'اردیبهشت', 3: 'خرداد',
+            4: 'تیر', 5: 'مرداد', 6: 'شهریور',
+            7: 'مهر', 8: 'آبان', 9: 'آذر',
+            10: 'دی', 11: 'بهمن', 12: 'اسفند'
+        };
+
+        // Chart.js default overrides for dark theme
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = 'rgba(36, 48, 79, 0.6)';
+        Chart.defaults.font.family = 'Vazirmatn, sans-serif';
+
+        // DOM elements
+        const filterYear = document.getElementById('filter-year');
+        const filterMonth = document.getElementById('filter-month');
+        const filterDept = document.getElementById('filter-dept');
+        const filterAction = document.getElementById('filter-action');
+        const filterSearch = document.getElementById('filter-search');
+        const btnResetFilters = document.getElementById('btn-reset-filters');
+        
+        const statTotalRows = document.getElementById('stat-total-rows');
+        const statTotalEdits = document.getElementById('stat-total-edits');
+        const statTotalDeletes = document.getElementById('stat-total-deletes');
+        const statRatioPercent = document.getElementById('stat-ratio-percent');
+
+        const matrixTableBody = document.getElementById('matrix-table-body');
+        const detailsTableBody = document.getElementById('details-table-body');
+        
+        const rowsCountText = document.getElementById('rows-count-text');
+        const paginationControls = document.getElementById('pagination-controls');
+        const paginationText = document.getElementById('pagination-text');
+        
+        const excelFileInput = document.getElementById('excel-file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const dataSourceInfo = document.getElementById('data-source-info');
+
+        // Chart variables to hold Chart instances
+        let chartPieAction = null;
+        let chartDoughnutDept = null;
+        let chartLineTrend = null;
+
+        // Pagination state
+        let currentPage = 1;
+        const rowsPerPage = 15;
+        let filteredDataset = [];
+
+        // Init dashboard
+        window.addEventListener('DOMContentLoaded', () => {
+            setupUploader();
+            setupFilters();
+            runAnalysis();
+        });
+
+        function setupFilters() {
+            const trigerAnalysis = () => {
+                currentPage = 1;
+                runAnalysis();
+            };
+            filterYear.addEventListener('change', trigerAnalysis);
+            filterMonth.addEventListener('change', trigerAnalysis);
+            filterDept.addEventListener('change', trigerAnalysis);
+            filterAction.addEventListener('change', trigerAnalysis);
+            filterSearch.addEventListener('input', trigerAnalysis);
+
+            btnResetFilters.addEventListener('click', () => {
+                filterYear.value = 'all';
+                filterMonth.value = 'all';
+                filterDept.value = 'all';
+                filterAction.value = 'all';
+                filterSearch.value = '';
+                trigerAnalysis();
+                showNotification('فیلترها پاک شدند');
+            });
+        }
+
+        // Setup Drag & Drop File Upload
+        function setupUploader() {
+            dropZone.addEventListener('click', () => excelFileInput.click());
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    processUploadedFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            excelFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) {
+                    processUploadedFile(e.target.files[0]);
+                }
+            });
+        }
+
+        // Show toast notification
+        function showNotification(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'notification';
+            toast.innerHTML = '<span>🔔</span><span>' + msg + '</span>';
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(20px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Parse excel file client-side using SheetJS
+        function processUploadedFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    const jsonRows = XLSX.utils.sheet_to_json(sheet);
+                    
+                    if (jsonRows.length === 0) {
+                        alert('فایل خالی است یا فرمت مناسبی ندارد.');
+                        return;
+                    }
+
+                    // Apply parsing rules to uploaded sheet
+                    const loadedData = parseRawExcelRows(jsonRows);
+                    dataset = loadedData;
+                    
+                    dataSourceInfo.innerText = 'اطلاعات در حال نمایش از فایل بارگذاری شده: ' + file.name + ' (' + loadedData.length + ' ردیف)';
+                    showNotification('فایل جدید با موفقیت تحلیل شد.');
+                    
+                    currentPage = 1;
+                    runAnalysis();
+                } catch (err) {
+                    console.error(err);
+                    alert('خطا در پردازش فایل. لطفا مطمئن شوید فایل یک اکسل معتبر با ستون‌های "موضوع" و "تاریخ مشاهده" است.');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Excel rows parser for Client Side
+        function parseRawExcelRows(rawRows) {
+            const directDates = rawRows.map(row => {
+                let dStr = row['تاریخ مشاهده'] || '';
+                let match = dStr.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                if (match) {
+                    return { year: parseInt(match[1]), month: parseInt(match[2]) };
+                }
+                // Try from subject
+                let subj = row['موضوع'] || '';
+                match = subj.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                if (match) {
+                    return { year: parseInt(match[1]), month: parseInt(match[2]) };
+                }
+                const monthNamesPersian = {
+                    'فروردین': 1, 'اردیبهشت': 2, 'خرداد': 3, 'تیر': 4, 'مرداد': 5, 'شهریور': 6,
+                    'مهر': 7, 'آبان': 8, 'آذر': 9, 'دی': 10, 'بهمن': 11, 'اسفند': 12
+                };
+                const pMonths = Object.keys(monthNamesPersian).join('|');
+                const monthRegex = new RegExp('(' + pMonths + ')\\s*(?:ماه)?\\s*(\\d{4})');
+                const matchMonth = subj.match(monthRegex);
+                if (matchMonth) {
+                    return { year: parseInt(matchMonth[2]), month: monthNamesPersian[matchMonth[1]] };
+                }
+                const monthRegex2 = new RegExp('(\\d{4})\\s*(?:ماه)?\\s*(' + pMonths + ')');
+                const matchMonth2 = subj.match(monthRegex2);
+                if (matchMonth2) {
+                    return { year: parseInt(matchMonth2[1]), month: monthNamesPersian[matchMonth2[2]] };
+                }
+                return null;
+            });
+
+            // Propagate dates
+            const finalDates = [];
+            for (let i = 0; i < rawRows.length; i++) {
+                let d = directDates[i];
+                if (!d) {
+                    let found = false;
+                    for (let j = i - 1; j >= 0; j--) {
+                        if (directDates[j]) {
+                            d = directDates[j];
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        for (let j = i + 1; j < rawRows.length; j++) {
+                            if (directDates[j]) {
+                                d = directDates[j];
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                finalDates.push(d);
+            }
+
+            function clientGetDept(subj) {
+                subj = subj.toLowerCase();
+                if (subj.includes('مجوز خروج کالا')) return 'تدارکات';
+                
+                for (const kw of ['سند حسابداری', 'درخواست پرداخت', 'اعلامیه پرداخت', 'دستور پرداخت', 'فاکتور خرید', 'صورت خلاصه تنخواه', 'سند رسید دریافت', 'اعلامیه بدهکار بستانکار', 'تامین وجه', 'علی الحساب']) {
+                    if (subj.includes(kw)) return 'حسابداری';
+                }
+                for (const kw of ['پیش فاکتور', 'حواله فروش', 'فاکتور فروش', 'پرفروم', 'پروفرما']) {
+                    if (subj.includes(kw)) return 'فروش';
+                }
+                for (const kw of ['درخواست کالا', 'سند انبار', 'مجوزبارگیری', 'مجوز خروج', 'برگ توزین', 'رسید انبار', 'مجوز تخلیه']) {
+                    if (subj.includes(kw)) return 'انبار';
+                }
+                for (const kw of ['سفارش خرید', 'درخواست خرید', 'مجوز خروج کالا']) {
+                    if (subj.includes(kw)) return 'تدارکات';
+                }
+
+                // Generics
+                for (const kw of ['سفارش', 'خرید', 'تامین کننده', 'تحویل']) {
+                    if (subj.includes(kw)) return 'تدارکات';
+                }
+                for (const kw of ['انبار', 'باسکول', 'توزین', 'وزن', 'تخلیه', 'ترخیص', 'ضایعات', 'کالا']) {
+                    if (subj.includes(kw)) return 'انبار';
+                }
+                for (const kw of ['حواله', 'فروش', 'مشتری', 'فاکتور']) {
+                    if (subj.includes(kw)) return 'فروش';
+                }
+                for (const kw of ['سند', 'اسناد', 'پرداخت', 'دریافت', 'تنخواه', 'بانک', 'هزینه', 'چک', 'حساب', 'بدهکار', 'بستانکار', 'مالیات', 'صورتحساب', 'پیمانکار']) {
+                    if (subj.includes(kw)) return 'حسابداری';
+                }
+                return 'سایر / نامشخص';
+            }
+
+            function clientGetAction(subj) {
+                if (subj.includes('حذف') || subj.includes('حذق')) return 'حذف';
+                const editKeywords = [
+                    'ثبت', 'تغییر وضعیت', 'تغیر وضعیت', 'اصلاح', 'ویرایش', 'ابطال', 'برگشت', 'تایید', 'فعالسازی', 'ایجاد', 'بازگشت', 'صدور'
+                ];
+                for (const kw of editKeywords) {
+                    if (subj.includes(kw)) return 'ویرایش';
+                }
+                return 'ویرایش';
+            }
+
+            return rawRows.map((row, i) => {
+                const subj = row['موضوع'] || '';
+                const dateObj = finalDates[i];
+                return {
+                    rowNum: i + 2,
+                    subject: subj,
+                    dateStr: row['تاریخ مشاهده'] || 'نامشخص',
+                    year: dateObj ? dateObj.year : null,
+                    month: dateObj ? dateObj.month : null,
+                    department: clientGetDept(subj),
+                    action: clientGetAction(subj)
+                };
+            });
+        }
+
+        // Perform analysis and refresh UI
+        function runAnalysis() {
+            // Apply sidebar filters
+            const yFilter = filterYear.value;
+            const mFilter = filterMonth.value;
+            const dFilter = filterDept.value;
+            const aFilter = filterAction.value;
+            const sFilter = filterSearch.value.trim().toLowerCase();
+
+            filteredDataset = dataset.filter(row => {
+                if (yFilter !== 'all' && String(row.year) !== yFilter) return false;
+                if (mFilter !== 'all' && String(row.month) !== mFilter) return false;
+                if (dFilter !== 'all' && row.department !== dFilter) return false;
+                if (aFilter !== 'all' && row.action !== aFilter) return false;
+                if (sFilter && !row.subject.toLowerCase().includes(sFilter)) return false;
+                return true;
+            });
+
+            // Update top count cards
+            const totalCount = filteredDataset.length;
+            const editCount = filteredDataset.filter(r => r.action === 'ویرایش').length;
+            const deleteCount = filteredDataset.filter(r => r.action === 'حذف').length;
+            const ratioPercent = totalCount > 0 ? Math.round((editCount / totalCount) * 100) : 0;
+
+            statTotalRows.innerText = totalCount.toLocaleString('fa-IR');
+            statTotalEdits.innerText = editCount.toLocaleString('fa-IR');
+            statTotalDeletes.innerText = deleteCount.toLocaleString('fa-IR');
+            statRatioPercent.innerText = ratioPercent.toLocaleString('fa-IR') + '٪';
+
+            // Render elements
+            renderMatrixTable();
+            renderCharts(editCount, deleteCount);
+            renderDetailsTable();
+        }
+
+        // Render aggregated matrix table
+        function renderMatrixTable() {
+            matrixTableBody.innerHTML = '';
+
+            const grouped = {};
+            filteredDataset.forEach(row => {
+                const period = row.year && row.month ? (row.year + ' / ' + String(row.month).padStart(2, '0') + ' (' + persianMonths[row.month] + ')') : 'نامشخص';
+                const dept = row.department;
+                const action = row.action;
+
+                if (!grouped[period]) grouped[period] = {};
+                if (!grouped[period][dept]) grouped[period][dept] = { edit: 0, delete: 0 };
+
+                if (action === 'ویرایش') grouped[period][dept].edit++;
+                if (action === 'حذف') grouped[period][dept].delete++;
+            });
+
+            const periods = Object.keys(grouped).sort((a, b) => {
+                if (a === 'نامشخص') return 1;
+                if (b === 'نامشخص') return -1;
+                return b.localeCompare(a);
+            });
+
+            if (periods.length === 0) {
+                matrixTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">داده‌ای منطبق با فیلترهای انتخاب شده وجود ندارد.</td></tr>';
+                return;
+            }
+
+            let grandTotalEdits = 0;
+            let grandTotalDeletes = 0;
+
+            periods.forEach(period => {
+                const deptsInPeriod = Object.keys(grouped[period]).sort();
+                
+                deptsInPeriod.forEach((dept, idx) => {
+                    const stats = grouped[period][dept];
+                    const total = stats.edit + stats.delete;
+                    const ratio = stats.delete > 0 ? (stats.edit / stats.delete).toFixed(2) : stats.edit;
+
+                    grandTotalEdits += stats.edit;
+                    grandTotalDeletes += stats.delete;
+
+                    const tr = document.createElement('tr');
+                    
+                    const tdPeriod = document.createElement('td');
+                    tdPeriod.innerHTML = idx === 0 ? '<strong>' + period + '</strong>' : '<span style="color: var(--text-muted);">' + period + '</span>';
+                    tr.appendChild(tdPeriod);
+
+                    const tdDept = document.createElement('td');
+                    tdDept.innerHTML = '<span class="badge dept">' + dept + '</span>';
+                    tr.appendChild(tdDept);
+
+                    const tdEdit = document.createElement('td');
+                    tdEdit.className = 'cell-highlight-edit';
+                    tdEdit.innerText = stats.edit.toLocaleString('fa-IR');
+                    tr.appendChild(tdEdit);
+
+                    const tdDelete = document.createElement('td');
+                    tdDelete.className = 'cell-highlight-delete';
+                    tdDelete.innerText = stats.delete.toLocaleString('fa-IR');
+                    tr.appendChild(tdDelete);
+
+                    const tdTotal = document.createElement('td');
+                    tdTotal.style.fontWeight = '700';
+                    tdTotal.innerText = total.toLocaleString('fa-IR');
+                    tr.appendChild(tdTotal);
+
+                    const tdRatio = document.createElement('td');
+                    tdRatio.style.direction = 'ltr';
+                    tdRatio.innerText = String(ratio).toLocaleString('fa-IR');
+                    tr.appendChild(tdRatio);
+
+                    matrixTableBody.appendChild(tr);
+                });
+            });
+
+            // Grand Total Row
+            const trTotal = document.createElement('tr');
+            trTotal.className = 'matrix-total';
+            trTotal.style.borderTop = '2px solid var(--primary-light)';
+            trTotal.style.background = 'rgba(99, 102, 241, 0.08)';
+
+            trTotal.innerHTML = `
+                <td colspan="2"><strong>مجموع کل فیلتر شده</strong></td>
+                <td class="cell-highlight-edit" style="font-size: 1.1rem;">${grandTotalEdits.toLocaleString('fa-IR')}</td>
+                <td class="cell-highlight-delete" style="font-size: 1.1rem;">${grandTotalDeletes.toLocaleString('fa-IR')}</td>
+                <td style="font-weight: 900; font-size: 1.1rem; color: var(--primary-light);">${(grandTotalEdits + grandTotalDeletes).toLocaleString('fa-IR')}</td>
+                <td style="direction: ltr; font-weight: 700;">${grandTotalDeletes > 0 ? (grandTotalEdits / grandTotalDeletes).toFixed(2).toLocaleString('fa-IR') : grandTotalEdits.toLocaleString('fa-IR')}</td>
+            `;
+            matrixTableBody.appendChild(trTotal);
+        }
+
+        // Render Circle & MoM Charts with ChartJS
+        function renderCharts(editCount, deleteCount) {
+            // --- 1. PIE/DONUT CHART (Action Types) ---
+            if (chartPieAction) chartPieAction.destroy();
+            
+            const ctxPie = document.getElementById('chart-pie-action').getContext('2d');
+            
+            if (editCount === 0 && deleteCount === 0) {
+                ctxPie.clearRect(0,0,300,300);
+            } else {
+                chartPieAction = new Chart(ctxPie, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['ویرایش', 'حذف'],
+                        datasets: [{
+                            data: [editCount, deleteCount],
+                            backgroundColor: ['#10b981', '#ef4444'],
+                            borderWidth: 2,
+                            borderColor: '#151d30',
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 20,
+                                    font: { size: 12 }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const val = context.raw;
+                                        const pct = ((val / (editCount + deleteCount)) * 100).toFixed(1);
+                                        return context.label + ': ' + val.toLocaleString('fa-IR') + ' (' + pct + '٪)';
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '65%'
+                    }
+                });
+            }
+
+            // --- 2. DOUGHNUT CHART (Departments) ---
+            if (chartDoughnutDept) chartDoughnutDept.destroy();
+            
+            const depts = {};
+            filteredDataset.forEach(r => {
+                depts[r.department] = (depts[r.department] || 0) + 1;
+            });
+            const deptLabels = Object.keys(depts);
+            const deptData = Object.values(depts);
+
+            const ctxDept = document.getElementById('chart-doughnut-dept').getContext('2d');
+            
+            const deptColors = {
+                'حسابداری': '#6366f1',
+                'فروش': '#f59e0b',
+                'انبار': '#06b6d4',
+                'تدارکات': '#d946ef',
+                'سایر / نامشخص': '#64748b'
+            };
+            const bgColors = deptLabels.map(l => deptColors[l] || '#4f46e5');
+
+            if (deptLabels.length === 0) {
+                ctxDept.clearRect(0,0,300,300);
+            } else {
+                chartDoughnutDept = new Chart(ctxDept, {
+                    type: 'doughnut',
+                    data: {
+                        labels: deptLabels,
+                        datasets: [{
+                            data: deptData,
+                            backgroundColor: bgColors,
+                            borderWidth: 2,
+                            borderColor: '#151d30',
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 15,
+                                    font: { size: 11 }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const val = context.raw;
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const pct = ((val / total) * 100).toFixed(1);
+                                        return context.label + ': ' + val.toLocaleString('fa-IR') + ' (' + pct + '٪)';
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '60%'
+                    }
+                });
+            }
+
+            // --- 3. MOM TREND AREA CHART ---
+            if (chartLineTrend) chartLineTrend.destroy();
+
+            const monthsGroup = {};
+            filteredDataset.forEach(row => {
+                if (row.year && row.month) {
+                    const key = row.year + '/' + String(row.month).padStart(2, '0');
+                    if (!monthsGroup[key]) monthsGroup[key] = { edit: 0, delete: 0 };
+                    if (row.action === 'ویرایش') monthsGroup[key].edit++;
+                    if (row.action === 'حذف') monthsGroup[key].delete++;
+                }
+            });
+
+            const sortedKeys = Object.keys(monthsGroup).sort();
+            const trendLabels = sortedKeys.map(k => {
+                const parts = k.split('/');
+                return parts[0] + ' / ' + persianMonths[parseInt(parts[1])];
+            });
+            const trendEdits = sortedKeys.map(k => monthsGroup[k].edit);
+            const trendDeletes = sortedKeys.map(k => monthsGroup[k].delete);
+
+            const ctxLine = document.getElementById('chart-line-trend').getContext('2d');
+            chartLineTrend = new Chart(ctxLine, {
+                type: 'line',
+                data: {
+                    labels: trendLabels,
+                    datasets: [
+                        {
+                            label: 'ویرایش',
+                            data: trendEdits,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 3,
+                            pointBackgroundColor: '#10b981',
+                            pointRadius: 4
+                        },
+                        {
+                            label: 'حذف',
+                            data: trendDeletes,
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 3,
+                            pointBackgroundColor: '#ef4444',
+                            pointRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: { size: 12 }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                callback: function(val) {
+                                    return val.toLocaleString('fa-IR');
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render Raw Details Table with Pagination
+        function renderDetailsTable() {
+            detailsTableBody.innerHTML = '';
+            
+            const totalRows = filteredDataset.length;
+            rowsCountText.innerText = 'تعداد ' + totalRows.toLocaleString('fa-IR') + ' ردیف یافت شد.';
+
+            if (totalRows === 0) {
+                detailsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">هیچ ردیفی با فیلترهای مشخص شده همخوانی ندارد.</td></tr>';
+                paginationControls.innerHTML = '';
+                paginationText.innerText = 'صفحه ۰ از ۰';
+                return;
+            }
+
+            const totalPages = Math.ceil(totalRows / rowsPerPage);
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = Math.min(startIndex + rowsPerPage, totalRows);
+
+            const pageRows = filteredDataset.slice(startIndex, endIndex);
+
+            pageRows.forEach(row => {
+                const tr = document.createElement('tr');
+
+                // Excel Row
+                const tdRow = document.createElement('td');
+                tdRow.style.color = 'var(--text-muted)';
+                tdRow.innerText = row.rowNum.toLocaleString('fa-IR');
+                tr.appendChild(tdRow);
+
+                // Date
+                const tdDate = document.createElement('td');
+                tdDate.style.direction = 'ltr';
+                tdDate.innerText = row.dateStr.toLocaleString('fa-IR');
+                tr.appendChild(tdDate);
+
+                // Dept Badge
+                const tdDept = document.createElement('td');
+                tdDept.innerHTML = '<span class="badge dept">' + row.department + '</span>';
+                tr.appendChild(tdDept);
+
+                // Action Badge
+                const tdAction = document.createElement('td');
+                const badgeClass = row.action === 'حذف' ? 'delete' : 'edit';
+                tdAction.innerHTML = '<span class="badge ' + badgeClass + '">' + row.action + '</span>';
+                tr.appendChild(tdAction);
+
+                // Subject
+                const tdSubject = document.createElement('td');
+                tdSubject.className = 'row-details';
+                tdSubject.innerText = row.subject;
+                tr.appendChild(tdSubject);
+
+                detailsTableBody.appendChild(tr);
+            });
+
+            // Render Pagination controls
+            paginationText.innerText = 'نمایش ردیف‌های ' + (startIndex + 1).toLocaleString('fa-IR') + ' تا ' + endIndex.toLocaleString('fa-IR') + ' از مجموع ' + totalRows.toLocaleString('fa-IR') + ' (صفحه ' + currentPage.toLocaleString('fa-IR') + ' از ' + totalPages.toLocaleString('fa-IR') + ')';
+            
+            paginationControls.innerHTML = '';
+            
+            // Prev Button
+            const btnPrev = document.createElement('button');
+            btnPrev.className = 'page-btn';
+            btnPrev.innerText = 'قبلی';
+            btnPrev.disabled = currentPage === 1;
+            btnPrev.addEventListener('click', () => {
+                currentPage--;
+                renderDetailsTable();
+            });
+            paginationControls.appendChild(btnPrev);
+
+            // Page numbers
+            const maxPageButtons = 5;
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+            if (endPage - startPage < maxPageButtons - 1) {
+                startPage = Math.max(1, endPage - maxPageButtons + 1);
+            }
+
+            for (let p = startPage; p <= endPage; p++) {
+                const btnPage = document.createElement('button');
+                btnPage.className = 'page-btn' + (p === currentPage ? ' active' : '');
+                btnPage.innerText = p.toLocaleString('fa-IR');
+                btnPage.addEventListener('click', () => {
+                    currentPage = p;
+                    renderDetailsTable();
+                });
+                paginationControls.appendChild(btnPage);
+            }
+
+            // Next Button
+            const btnNext = document.createElement('button');
+            btnNext.className = 'page-btn';
+            btnNext.innerText = 'بعدی';
+            btnNext.disabled = currentPage === totalPages;
+            btnNext.addEventListener('click', () => {
+                currentPage++;
+                renderDetailsTable();
+            });
+            paginationControls.appendChild(btnNext);
+        }
+    </script>
+</body>
+</html>
