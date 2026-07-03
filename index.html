@@ -612,7 +612,12 @@
     <div id="view-edit-delete" class="tab-content active">
         <!-- Top Excel Uploader -->
         <div class="card" style="flex-direction: row; justify-content: space-between; align-items: center; padding: 1rem 1.5rem;">
-            <span id="data-source-info" style="font-size: 0.9rem; color: var(--text-muted);">بارگذاری شده از فایل اصلی all-remove-edit.xlsx (۴۸۶ ردیف فیلتر شده)</span>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <span id="data-source-info" style="font-size: 0.9rem; color: var(--text-muted);">بارگذاری شده از فایل اصلی all-remove-edit.xlsx (۴۸۶ ردیف فیلتر شده)</span>
+                <a href="https://github.com/Alireza-Ghavabesh/amar-edit-remove/raw/main/all-remove-edit.xlsx" download class="download-link" style="font-size: 0.85rem; color: var(--primary-light); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; font-weight: bold;">
+                    📥 دانلود فایل اکسل نمونه (all-remove-edit.xlsx)
+                </a>
+            </div>
             <div class="upload-zone" id="drop-zone">
                 <span class="upload-icon">📂</span>
                 <div class="upload-text">
@@ -832,7 +837,12 @@
                 <strong>ستون D (D1): نوع عملیات</strong> (جدید / اصلاح) | 
                 <strong>ستون E (E1): توضیحات</strong>
             </p>
-            <button class="btn-reset" style="background: var(--primary-light); border: none; padding: 0.75rem 2rem; font-size: 1rem; border-radius: 8px; color: white;" onclick="document.getElementById('bpmn-file-input').click()">📁 انتخاب و بارگذاری فایل اکسل</button>
+            <div style="display: flex; gap: 1rem; align-items: center; justify-content: center; flex-wrap: wrap;">
+                <button class="btn-reset" style="background: var(--primary-light); border: none; padding: 0.75rem 2rem; font-size: 1rem; border-radius: 8px; color: white;" onclick="document.getElementById('bpmn-file-input').click()">📁 انتخاب و بارگذاری فایل اکسل</button>
+                <a href="https://github.com/Alireza-Ghavabesh/amar-edit-remove/raw/main/ERA.xlsx" download class="btn-reset" style="background: rgba(99, 102, 241, 0.1); border: 1px solid var(--primary-light); color: var(--primary-light); padding: 0.75rem 2rem; font-size: 1rem; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s;">
+                    📥 دانلود فایل اکسل نمونه (ERA.xlsx)
+                </a>
+            </div>
             <input type="file" id="bpmn-file-input" accept=".xlsx, .xls" style="display: none;">
         </div>
 
@@ -870,6 +880,7 @@
                         <button class="btn-reset" style="background: rgba(99, 102, 241, 0.1); border: 1px solid var(--primary-light); color: var(--primary-light); width: 100%; font-weight: 700;" onclick="document.getElementById('bpmn-file-input-sidebar').click()">📥 بارگذاری فایل جدید</button>
                         <input type="file" id="bpmn-file-input-sidebar" accept=".xlsx, .xls" style="display: none;">
                         <button class="btn-reset" style="background: transparent; border: 1px solid var(--accent-delete); color: var(--accent-delete); width: 100%;" onclick="clearBpmnData()">🗑️ پاک کردن اطلاعات</button>
+                        <a href="https://github.com/Alireza-Ghavabesh/amar-edit-remove/raw/main/ERA.xlsx" download style="display: block; text-align: center; margin-top: 0.5rem; font-size: 0.8rem; color: var(--primary-light); text-decoration: none; font-weight: bold;">📥 دانلود فایل نمونه (ERA.xlsx)</a>
                     </div>
 
                     <div class="filter-group">
