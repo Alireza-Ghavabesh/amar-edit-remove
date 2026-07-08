@@ -1145,13 +1145,13 @@
             // Gather from originalDataset (tab 1)
             if (typeof originalDataset !== 'undefined' && Array.isArray(originalDataset)) {
                 originalDataset.forEach(row => {
-                    if (row.department) depts.add(row.department.trim());
+                    if (row.department && row.department.trim() !== 'ارتباطات و فن آوری اطلاعات') depts.add(row.department.trim());
                 });
             }
             // Gather from bpmnDataset (tab 2)
             if (typeof bpmnDataset !== 'undefined' && Array.isArray(bpmnDataset)) {
                 bpmnDataset.forEach(row => {
-                    if (row.department) depts.add(row.department.trim());
+                    if (row.department && row.department.trim() !== 'ارتباطات و فن آوری اطلاعات') depts.add(row.department.trim());
                 });
             }
 
@@ -1479,9 +1479,10 @@
                 };
             });
 
-            // Keep only rows with valid department AND worker is not 'نامشخص'
+            // Keep only rows with valid department AND worker is not 'نامشخص' (ignoring ICT)
             const filteredByWorker = mapped.filter(row => 
                 row.department !== null && 
+                row.department !== 'ارتباطات و فن آوری اطلاعات' &&
                 row.worker && row.worker !== 'نامشخص'
             );
 
@@ -2537,6 +2538,10 @@
                             continue;
                         }
                         
+                        if (String(departmentText).trim() === 'ارتباطات و فن آوری اطلاعات') {
+                            continue;
+                        }
+                        
                         parsed.push({
                             rowNum: i + 1,
                             subject: String(processName),
@@ -2602,6 +2607,7 @@
             const sFilter = document.getElementById('bpmn-filter-search').value.trim().toLowerCase();
 
             bpmnFilteredDataset = bpmnDataset.filter(row => {
+                if (row.department === 'ارتباطات و فن آوری اطلاعات') return false;
                 if (yFilter !== 'all' && String(row.year) !== yFilter) return false;
                 if (mFilter !== 'all' && String(row.month) !== mFilter) return false;
                 if (dFilter !== 'all' && row.department !== dFilter) return false;
