@@ -1123,6 +1123,25 @@
         // Performer & File assignment settings
         let performerDetectionMode = 'recipient';
         let filePerformerMap = {};
+        const fileExecutorCache = {};
+
+        function detectPerformerFromFirstRow(rawRows) {
+            if (!rawRows || rawRows.length === 0) return 'recipient';
+            const firstRow = rawRows[0];
+            const executorKey = Object.keys(firstRow).find(key => key.trim() === 'انجام دهنده');
+            const executor = executorKey ? firstRow[executorKey] : null;
+            if (executor && typeof executor === 'string') {
+                const val = executor.trim();
+                if (val.includes('غوابش')) {
+                    return 'علیرضا اصل غوابشی';
+                }
+                if (val.includes('متین')) {
+                    return 'محمد متین';
+                }
+                return val;
+            }
+            return 'recipient';
+        }
 
         // Global map to hold stable department colors
         let deptColorsMap = {};
@@ -1212,13 +1231,7 @@
                         if (performerDetectionMode === 'recipient') {
                             filePerformerMap[name] = 'recipient';
                         } else {
-                            const fileRows = originalDataset.filter(r => r.fileName === name);
-                            let detected = 'recipient';
-                            const firstRowWithExecutor = fileRows.find(r => r.localWorker && r.localWorker !== 'نامشخص');
-                            if (firstRowWithExecutor) {
-                                detected = firstRowWithExecutor.localWorker;
-                            }
-                            filePerformerMap[name] = detected;
+                            filePerformerMap[name] = fileExecutorCache[name] || 'recipient';
                         }
                     });
                     
@@ -1357,6 +1370,10 @@
             isUsingUploadedData = false;
             loadedFileNames = [];
             filePerformerMap = {};
+            // Clear cache
+            for (let prop in fileExecutorCache) {
+                delete fileExecutorCache[prop];
+            }
             originalDataset = JSON.parse(JSON.stringify(dataset));
             renderFileSettingsUI();
             applyKeywordMappings();
@@ -1387,7 +1404,8 @@
                             
                             if (jsonRows.length > 0) {
                                 const loadedData = parseRawExcelRows(jsonRows, file.name);
-                                resolve({ name: file.name, rows: loadedData });
+                                const detectedExecutor = detectPerformerFromFirstRow(jsonRows);
+                                resolve({ name: file.name, rows: loadedData, executor: detectedExecutor });
                             } else {
                                 resolve(null);
                             }
@@ -1413,18 +1431,13 @@
                         if (!loadedFileNames.includes(res.name)) {
                             loadedFileNames.push(res.name);
                             originalDataset = originalDataset.concat(res.rows);
+                            fileExecutorCache[res.name] = res.executor;
                             
                             // Initialize file performer mapping for this new file
                             if (performerDetectionMode === 'recipient') {
                                 filePerformerMap[res.name] = 'recipient';
                             } else {
-                                // Find the first row's local worker in the file rows
-                                let detected = 'recipient';
-                                const firstRowWithExecutor = res.rows.find(r => r.localWorker && r.localWorker !== 'نامشخص');
-                                if (firstRowWithExecutor) {
-                                    detected = firstRowWithExecutor.localWorker;
-                                }
-                                filePerformerMap[res.name] = detected;
+                                filePerformerMap[res.name] = res.executor;
                             }
                             
                             processedCount++;
