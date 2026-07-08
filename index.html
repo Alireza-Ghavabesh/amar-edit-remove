@@ -2072,7 +2072,15 @@
                                         label: function(context) {
                                             const label = context.dataset.label;
                                             const val = context.raw;
-                                            return label + ': ' + val.toLocaleString('fa-IR') + ' اقدام';
+                                            const dataIndex = context.dataIndex;
+                                            const editVal = context.chart.data.datasets[0].data[dataIndex] || 0;
+                                            const removeVal = context.chart.data.datasets[1].data[dataIndex] || 0;
+                                            const sum = editVal + removeVal;
+                                            
+                                            return [
+                                                label + ': ' + val.toLocaleString('fa-IR') + ' اقدام',
+                                                'مجموع: ' + sum.toLocaleString('fa-IR') + ' اقدام'
+                                            ];
                                         }
                                     }
                                 }
