@@ -2198,6 +2198,9 @@
                                 }
                             },
                             tooltip: {
+                                filter: function(tooltipItem) {
+                                    return tooltipItem.raw > 0;
+                                },
                                 callbacks: {
                                     label: function(context) {
                                         return context.dataset.label + ': ' + context.raw.toLocaleString('fa-IR');
@@ -2915,6 +2918,9 @@
                                 }
                             },
                             tooltip: {
+                                filter: function(tooltipItem) {
+                                    return tooltipItem.raw > 0;
+                                },
                                 callbacks: {
                                     label: function(context) {
                                         return context.dataset.label + ': ' + context.raw.toLocaleString('fa-IR');
