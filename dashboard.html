@@ -396,7 +396,7 @@
             position: relative;
             flex-grow: 1;
             width: 100%;
-            height: 400px;
+            height: 800px;
         }
 
         /* Toggle Buttons for Charts */
@@ -2198,9 +2198,6 @@
                                 }
                             },
                             tooltip: {
-                                filter: function(tooltipItem) {
-                                    return tooltipItem.raw > 0;
-                                },
                                 callbacks: {
                                     label: function(context) {
                                         return context.dataset.label + ': ' + context.raw.toLocaleString('fa-IR');
@@ -2918,9 +2915,6 @@
                                 }
                             },
                             tooltip: {
-                                filter: function(tooltipItem) {
-                                    return tooltipItem.raw > 0;
-                                },
                                 callbacks: {
                                     label: function(context) {
                                         return context.dataset.label + ': ' + context.raw.toLocaleString('fa-IR');
