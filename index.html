@@ -995,6 +995,16 @@
                             </div>
                         </div>
 
+                        <!-- BPMN Stacked Bar Chart -->
+                        <div class="card chart-card full-width">
+                            <div class="card-header" style="border-bottom:none; padding-bottom:0;">
+                                <h3 class="card-title">تعداد اقدامات به تفکیک نوع و واحد (BPMN)</h3>
+                            </div>
+                            <div class="chart-wrapper" style="height: 350px;">
+                                <canvas id="bpmn-chart-bar-dept-actions"></canvas>
+                            </div>
+                        </div>
+
                         <div class="card chart-card full-width">
                             <div class="card-header" style="border-bottom:none; padding-bottom:0;">
                                 <div>
@@ -2352,6 +2362,7 @@
         let bpmnChartPieAction = null;
         let bpmnChartDoughnutDept = null;
         let bpmnChartLineTrend = null;
+        let bpmnChartBarDeptActions = null;
 
         function initBpmnDashboard() {
             const saved = localStorage.getItem('bpmnDataset');
@@ -2823,6 +2834,106 @@
                                 }
                             },
                             cutout: '60%'
+                        }
+                    });
+                }
+
+                // --- BPMN Stacked Bar Chart ---
+                if (bpmnChartBarDeptActions) bpmnChartBarDeptActions.destroy();
+                
+                const ctxBar = document.getElementById('bpmn-chart-bar-dept-actions').getContext('2d');
+                
+                const bpmnDepts = {};
+                bpmnFilteredDataset.forEach(r => {
+                    bpmnDepts[r.department] = (bpmnDepts[r.department] || 0) + 1;
+                });
+                const bpmnDeptLabels = Object.keys(bpmnDepts).sort();
+                
+                const bpmnDeptCreates = [];
+                const bpmnDeptEdits = [];
+                
+                bpmnDeptLabels.forEach(dept => {
+                    let creates = 0;
+                    let edits = 0;
+                    bpmnFilteredDataset.forEach(r => {
+                        if (r.department === dept) {
+                            if (r.action === 'جدید') creates++;
+                            else if (r.action === 'اصلاح') edits++;
+                        }
+                    });
+                    bpmnDeptCreates.push(creates);
+                    bpmnDeptEdits.push(edits);
+                });
+
+                if (bpmnDeptLabels.length === 0) {
+                    ctxBar.clearRect(0, 0, 300, 300);
+                } else {
+                    bpmnChartBarDeptActions = new Chart(ctxBar, {
+                        type: 'bar',
+                        data: {
+                            labels: bpmnDeptLabels,
+                            datasets: [
+                                {
+                                    label: 'جدید',
+                                    data: bpmnDeptCreates,
+                                    backgroundColor: '#10b981', // green for new
+                                    borderWidth: 1,
+                                    borderRadius: 4
+                                },
+                                {
+                                    label: 'اصلاح',
+                                    data: bpmnDeptEdits,
+                                    backgroundColor: '#6366f1', // indigo for modify
+                                    borderWidth: 1,
+                                    borderRadius: 4
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top',
+                                    labels: {
+                                        padding: 10,
+                                        font: { size: 11 }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const label = context.dataset.label;
+                                            const val = context.raw;
+                                            const dataIndex = context.dataIndex;
+                                            const cVal = context.chart.data.datasets[0].data[dataIndex] || 0;
+                                            const eVal = context.chart.data.datasets[1].data[dataIndex] || 0;
+                                            const sum = cVal + eVal;
+                                            
+                                            return [
+                                                label + ': ' + val.toLocaleString('fa-IR') + ' اقدام',
+                                                'مجموع: ' + sum.toLocaleString('fa-IR') + ' اقدام'
+                                            ];
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    stacked: true,
+                                    grid: {
+                                        display: false
+                                    }
+                                },
+                                y: {
+                                    stacked: true,
+                                    beginAtZero: true,
+                                    ticks: {
+                                        precision: 0
+                                    }
+                                }
+                            }
                         }
                     });
                 }
