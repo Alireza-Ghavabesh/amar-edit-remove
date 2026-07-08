@@ -1124,17 +1124,39 @@
         let performerDetectionMode = 'recipient';
         let filePerformerMap = {};
 
-        // Stable department colors mapping
-        const deptColorsMap = {};
-        const availableColors = ['#6366f1', '#f59e0b', '#06b6d4', '#d946ef', '#10b981', '#ec4899', '#3b82f6', '#8b5cf6'];
-        let colorIdx = 0;
+        // Global map to hold stable department colors
+        let deptColorsMap = {};
+
+        function initUniqueColors() {
+            const depts = new Set();
+            
+            // Gather from originalDataset (tab 1)
+            if (typeof originalDataset !== 'undefined' && Array.isArray(originalDataset)) {
+                originalDataset.forEach(row => {
+                    if (row.department) depts.add(row.department.trim());
+                });
+            }
+            // Gather from bpmnDataset (tab 2)
+            if (typeof bpmnDataset !== 'undefined' && Array.isArray(bpmnDataset)) {
+                bpmnDataset.forEach(row => {
+                    if (row.department) depts.add(row.department.trim());
+                });
+            }
+
+            const sortedDepts = Array.from(depts).sort();
+            const goldenRatioConjugate = 0.618033988749895;
+            
+            deptColorsMap = {};
+            sortedDepts.forEach((dept, idx) => {
+                const hue = Math.floor((idx * goldenRatioConjugate * 360) % 360);
+                deptColorsMap[dept] = `hsl(${hue}, 70%, 50%)`;
+            });
+        }
         
         function getDeptColor(deptName) {
             if (!deptName) return '#4f46e5';
-            if (deptColorsMap[deptName]) return deptColorsMap[deptName];
-            deptColorsMap[deptName] = availableColors[colorIdx % availableColors.length];
-            colorIdx++;
-            return deptColorsMap[deptName];
+            const stdDept = deptName.trim();
+            return deptColorsMap[stdDept] || '#4f46e5';
         }
 
         // Interactive trend chart state
@@ -1474,6 +1496,7 @@
 
             dataset = Array.from(seen.values());
 
+            initUniqueColors();
             populateDeptFilter();
             populateWorkerFilter();
             currentPage = 1;
@@ -2522,6 +2545,7 @@
         }
 
         function runBpmnAnalysis() {
+            initUniqueColors();
             const yFilter = document.getElementById('bpmn-filter-year').value;
             const mFilter = document.getElementById('bpmn-filter-month').value;
             const dFilter = document.getElementById('bpmn-filter-dept').value;
