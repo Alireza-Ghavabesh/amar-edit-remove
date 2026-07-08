@@ -777,6 +777,16 @@
                         </div>
                     </div>
 
+                    <!-- New Department Bar Chart -->
+                    <div class="card chart-card full-width">
+                        <div class="card-header" style="border-bottom:none; padding-bottom:0;">
+                            <h3 class="card-title">تعداد اقدامات به تفکیک واحد</h3>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chart-bar-dept-actions"></canvas>
+                        </div>
+                    </div>
+
                     <div class="card chart-card full-width">
                         <div class="card-header" style="border-bottom:none; padding-bottom:0;">
                             <div>
@@ -1104,6 +1114,7 @@
         let chartDoughnutDept = null;
         let chartDoughnutWorker = null;
         let chartLineTrend = null;
+        let chartBarDeptActions = null;
 
         // Uploader state
         let isUsingUploadedData = false;
@@ -1963,6 +1974,60 @@
                                 }
                             },
                             cutout: '60%'
+                        }
+                    });
+                }
+
+                // --- 3.1 BAR CHART (Total Actions per Department) ---
+                if (chartBarDeptActions) chartBarDeptActions.destroy();
+                
+                const ctxBar = document.getElementById('chart-bar-dept-actions').getContext('2d');
+                const barBgColors = deptLabels.map(l => getDeptColor(l));
+                
+                if (deptLabels.length === 0) {
+                    ctxBar.clearRect(0, 0, 300, 300);
+                } else {
+                    chartBarDeptActions = new Chart(ctxBar, {
+                        type: 'bar',
+                        data: {
+                            labels: deptLabels,
+                            datasets: [{
+                                label: 'تعداد کل اقدامات',
+                                data: deptData,
+                                backgroundColor: barBgColors,
+                                borderWidth: 1,
+                                borderRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const val = context.raw;
+                                            return 'اقدامات: ' + val.toLocaleString('fa-IR');
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: false
+                                    }
+                                },
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        precision: 0
+                                    }
+                                }
+                            }
                         }
                     });
                 }
