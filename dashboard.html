@@ -1131,14 +1131,7 @@
             const executorKey = Object.keys(firstRow).find(key => key.trim() === 'انجام دهنده');
             const executor = executorKey ? firstRow[executorKey] : null;
             if (executor && typeof executor === 'string') {
-                const val = executor.trim();
-                if (val.includes('غوابش')) {
-                    return 'علیرضا اصل غوابشی';
-                }
-                if (val.includes('متین')) {
-                    return 'محمد متین';
-                }
-                return val;
+                return executor.trim();
             }
             return 'recipient';
         }
@@ -1478,12 +1471,6 @@
                     }
                 }
                 
-                if (w === 'غوابش' || (w && w.includes('غوابش'))) {
-                    w = 'علیرضا اصل غوابشی';
-                }
-                if (w && w.includes('متین')) {
-                    w = 'محمد متین';
-                }
                 return {
                     ...row,
                     department: dept,
@@ -1492,10 +1479,10 @@
                 };
             });
 
-            // Keep only rows with valid department AND worker as 'محمد متین' or 'علیرضا اصل غوابشی'
+            // Keep only rows with valid department AND worker is not 'نامشخص'
             const filteredByWorker = mapped.filter(row => 
                 row.department !== null && 
-                (row.worker === 'محمد متین' || row.worker === 'علیرضا اصل غوابشی')
+                row.worker && row.worker !== 'نامشخص'
             );
 
             // Deduplicate by subject (موضوع): keep the last occurrence
@@ -1532,6 +1519,24 @@
                 return;
             }
 
+            // Gather all unique performers from originalDataset to populate options
+            const uniqueWorkers = new Set();
+            uniqueWorkers.add('غوابش');
+            uniqueWorkers.add('متین');
+            uniqueWorkers.add('علیرضا اصل غوابشی');
+            uniqueWorkers.add('محمد متین');
+            
+            originalDataset.forEach(row => {
+                if (row.worker && row.worker !== 'نامشخص') {
+                    uniqueWorkers.add(row.worker);
+                }
+                if (row.localWorker && row.localWorker !== 'نامشخص') {
+                    uniqueWorkers.add(row.localWorker);
+                }
+            });
+
+            const workersList = Array.from(uniqueWorkers).sort();
+
             container.innerHTML = '';
             loadedFileNames.forEach(name => {
                 const currentVal = filePerformerMap[name] || 'recipient';
@@ -1547,6 +1552,11 @@
                 rowDiv.style.gap = '1rem';
                 rowDiv.style.flexWrap = 'wrap';
 
+                let optionsHtml = `<option value="recipient" ${currentVal === 'recipient' ? 'selected' : ''}>تشخیص ردیف به ردیف (گیرنده)</option>`;
+                workersList.forEach(w => {
+                    optionsHtml += `<option value="${w}" ${currentVal === w ? 'selected' : ''}>${w}</option>`;
+                });
+
                 rowDiv.innerHTML = `
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <span style="font-size: 1.1rem;">📄</span>
@@ -1555,9 +1565,7 @@
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <span style="font-size: 0.8rem; color: var(--text-muted);">انجام‌دهنده این فایل:</span>
                         <select class="file-worker-override-select" data-filename="${name}" style="background: var(--bg-dark); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.2rem 0.4rem; border-radius: 6px; font-size: 0.8rem; outline: none; cursor: pointer;">
-                            <option value="recipient" ${currentVal === 'recipient' ? 'selected' : ''}>تشخیص ردیف به ردیف (گیرنده)</option>
-                            <option value="محمد متین" ${currentVal === 'محمد متین' ? 'selected' : ''}>محمد متین</option>
-                            <option value="علیرضا اصل غوابشی" ${currentVal === 'علیرضا اصل غوابشی' ? 'selected' : ''}>علیرضا اصل غوابشی</option>
+                            ${optionsHtml}
                         </select>
                     </div>
                 `;
@@ -1699,13 +1707,7 @@
                     const executorKey = Object.keys(row).find(key => key.trim() === 'انجام دهنده');
                     const executor = executorKey ? row[executorKey] : null;
                     if (executor && typeof executor === 'string') {
-                        if (executor.includes('غوابش')) {
-                            workerVal = 'علیرضا اصل غوابشی';
-                        } else if (executor.includes('متین')) {
-                            workerVal = 'محمد متین';
-                        } else {
-                            workerVal = executor;
-                        }
+                        workerVal = executor.trim();
                     }
                 }
 
