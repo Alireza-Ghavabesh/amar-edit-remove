@@ -780,7 +780,7 @@
                     <!-- New Department Bar Chart -->
                     <div class="card chart-card full-width">
                         <div class="card-header" style="border-bottom:none; padding-bottom:0;">
-                            <h3 class="card-title">تعداد اقدامات به تفکیک واحد</h3>
+                            <h3 class="card-title">تعداد اقدامات به تفکیک نوع و واحد</h3>
                         </div>
                         <div class="chart-wrapper" style="height: 350px;">
                             <canvas id="chart-bar-dept-actions"></canvas>
@@ -2009,12 +2009,28 @@
                     });
                 }
 
-                // --- 3.1 BAR CHART (Total Actions per Department) ---
+                // --- 3.1 BAR CHART (Total Actions per Department split by Edit/Remove) ---
                 if (chartBarDeptActions) chartBarDeptActions.destroy();
                 
                 const ctxBar = document.getElementById('chart-bar-dept-actions').getContext('2d');
-                const barBgColors = deptLabels.map(l => getDeptColor(l));
                 
+                // Calculate edits and removes per department
+                const deptEdits = [];
+                const deptRemoves = [];
+                
+                deptLabels.forEach(dept => {
+                    let edits = 0;
+                    let removes = 0;
+                    filteredDataset.forEach(r => {
+                        if (r.department === dept) {
+                            if (r.action === 'ویرایش') edits++;
+                            else if (r.action === 'حذف') removes++;
+                        }
+                    });
+                    deptEdits.push(edits);
+                    deptRemoves.push(removes);
+                });
+
                 if (deptLabels.length === 0) {
                     ctxBar.clearRect(0, 0, 300, 300);
                 } else {
@@ -2022,37 +2038,54 @@
                         type: 'bar',
                         data: {
                             labels: deptLabels,
-                            datasets: [{
-                                label: 'تعداد کل اقدامات',
-                                data: deptData,
-                                backgroundColor: barBgColors,
-                                borderWidth: 1,
-                                borderRadius: 6
-                            }]
+                            datasets: [
+                                {
+                                    label: 'ویرایش',
+                                    data: deptEdits,
+                                    backgroundColor: '#10b981', // green for edit
+                                    borderWidth: 1,
+                                    borderRadius: 4
+                                },
+                                {
+                                    label: 'حذف',
+                                    data: deptRemoves,
+                                    backgroundColor: '#ef4444', // red for remove
+                                    borderWidth: 1,
+                                    borderRadius: 4
+                                }
+                            ]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
                                 legend: {
-                                    display: false
+                                    display: true,
+                                    position: 'top',
+                                    labels: {
+                                        padding: 10,
+                                        font: { size: 11 }
+                                    }
                                 },
                                 tooltip: {
                                     callbacks: {
                                         label: function(context) {
+                                            const label = context.dataset.label;
                                             const val = context.raw;
-                                            return 'اقدامات: ' + val.toLocaleString('fa-IR');
+                                            return label + ': ' + val.toLocaleString('fa-IR') + ' اقدام';
                                         }
                                     }
                                 }
                             },
                             scales: {
                                 x: {
+                                    stacked: true,
                                     grid: {
                                         display: false
                                     }
                                 },
                                 y: {
+                                    stacked: true,
                                     beginAtZero: true,
                                     ticks: {
                                         precision: 0
