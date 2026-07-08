@@ -1519,21 +1519,14 @@
                 return;
             }
 
-            // Gather all unique performers from originalDataset to populate options
+            // Gather only the actual performers read from row 2 of column 'انجام دهنده' of loaded files
             const uniqueWorkers = new Set();
-            uniqueWorkers.add('غوابش');
-            uniqueWorkers.add('متین');
-            uniqueWorkers.add('علیرضا اصل غوابشی');
-            uniqueWorkers.add('محمد متین');
-            
-            originalDataset.forEach(row => {
-                if (row.worker && row.worker !== 'نامشخص') {
-                    uniqueWorkers.add(row.worker);
+            for (let name in fileExecutorCache) {
+                const w = fileExecutorCache[name];
+                if (w && w !== 'recipient' && w !== 'نامشخص') {
+                    uniqueWorkers.add(w);
                 }
-                if (row.localWorker && row.localWorker !== 'نامشخص') {
-                    uniqueWorkers.add(row.localWorker);
-                }
-            });
+            }
 
             const workersList = Array.from(uniqueWorkers).sort();
 
