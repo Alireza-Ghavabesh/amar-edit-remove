@@ -632,8 +632,8 @@
             </div>
         </div>
 
-        <!-- Performer & File Settings Card -->
-        <div class="card" id="performer-settings-card" style="display: flex; flex-direction: column; gap: 1rem; border: 1px solid var(--border-color); padding: 1rem 1.5rem; margin-bottom: 1.5rem;">
+        <!-- Performer & File Settings Card (Hidden) -->
+        <div class="card" id="performer-settings-card" style="display: none !important; flex-direction: column; gap: 1rem; border: 1px solid var(--border-color); padding: 1rem 1.5rem; margin-bottom: 1.5rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                 <h4 style="margin: 0; font-size: 0.95rem; font-weight: bold; display: flex; align-items: center; gap: 0.35rem; color: var(--text-main);">
                     ⚙️ تنظیمات انتساب انجام‌دهنده به فایل‌ها
@@ -720,7 +720,7 @@
                     </select>
                 </div>
 
-                <div class="filter-group">
+                <div class="filter-group" style="display: none !important;">
                     <label for="filter-worker">انجام‌دهنده</label>
                     <select id="filter-worker">
                         <option value="all">همه انجام‌دهندگان</option>
@@ -1479,11 +1479,10 @@
                 };
             });
 
-            // Keep only rows with valid department AND worker is not 'نامشخص' (ignoring ICT)
+            // Keep only rows with valid department (ignoring ICT, all workers included)
             const filteredByWorker = mapped.filter(row => 
                 row.department !== null && 
-                row.department !== 'ارتباطات و فن آوری اطلاعات' &&
-                row.worker && row.worker !== 'نامشخص'
+                row.department !== 'ارتباطات و فن آوری اطلاعات'
             );
 
             // Deduplicate by subject (موضوع): keep the last occurrence
@@ -1735,7 +1734,7 @@
                 if (yFilter !== 'all' && String(row.year) !== yFilter) return false;
                 if (mFilter !== 'all' && String(row.month) !== mFilter) return false;
                 if (dFilter !== 'all' && row.department !== dFilter) return false;
-                if (wFilter !== 'all' && row.worker !== wFilter) return false;
+                // if (wFilter !== 'all' && row.worker !== wFilter) return false; // Ignored worker
                 if (aFilter !== 'all' && row.action !== aFilter) return false;
                 if (sFilter && !row.subject.toLowerCase().includes(sFilter)) return false;
                 return true;
