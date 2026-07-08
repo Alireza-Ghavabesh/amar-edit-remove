@@ -614,8 +614,14 @@
             <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                 <span id="data-source-info" style="font-size: 0.9rem; color: var(--text-muted);">بارگذاری شده از فایل اصلی all-remove-edit.xlsx (۴۸۶ ردیف فیلتر شده)</span>
                 <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-                    <a href="https://github.com/Alireza-Ghavabesh/amar-edit-remove/raw/main/all-remove-edit.xlsx" download class="download-link" style="font-size: 0.85rem; color: var(--primary-light); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; font-weight: bold;">
-                        📥 دانلود فایل اکسل نمونه (all-remove-edit.xlsx)
+                    <a href="https://github.com/Alireza-Ghavabesh/amar-edit-remove/raw/main/matin.xlsx" download class="download-link" style="font-size: 0.85rem; color: var(--primary-light); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; font-weight: bold; margin-left: 1rem;">
+                        📥 دانلود matin.xlsx
+                    </a>
+                    <a href="https://github.com/Alireza-Ghavabesh/amar-edit-remove/raw/main/ghavabesh.xlsx" download class="download-link" style="font-size: 0.85rem; color: var(--primary-light); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; font-weight: bold; margin-left: 1rem;">
+                        📥 دانلود ghavabesh.xlsx
+                    </a>
+                    <a href="https://github.com/Alireza-Ghavabesh/amar-edit-remove/raw/main/ghavabesh-tafyiz.xlsx" download class="download-link" style="font-size: 0.85rem; color: var(--primary-light); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; font-weight: bold;">
+                        📥 دانلود ghavabesh-tafyiz.xlsx
                     </a>
                     <button id="btn-clear-uploaded" onclick="resetToDefaultDataset()" style="display: none; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--accent-delete); color: var(--accent-delete); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.2s;">
                         ❌ پاک کردن فایل‌های آپلود شده
@@ -758,22 +764,12 @@
                         </div>
                     </div>
 
-                    <div class="card chart-card">
+                    <div class="card chart-card full-width">
                         <div class="card-header" style="border-bottom:none; padding-bottom:0;">
                             <h3 class="card-title">نسبت نوع اقدام</h3>
                         </div>
-                        <div class="chart-wrapper">
+                        <div class="chart-wrapper" style="height: 350px;">
                             <canvas id="chart-pie-action"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- New Worker Breakdown Chart -->
-                    <div class="card chart-card">
-                        <div class="card-header" style="border-bottom:none; padding-bottom:0;">
-                            <h3 class="card-title">سهم اقدامات به تفکیک انجام‌دهنده</h3>
-                        </div>
-                        <div class="chart-wrapper">
-                            <canvas id="chart-doughnut-worker"></canvas>
                         </div>
                     </div>
 
@@ -986,11 +982,11 @@
                             </div>
                         </div>
 
-                        <div class="card chart-card">
+                        <div class="card chart-card full-width">
                             <div class="card-header" style="border-bottom:none; padding-bottom:0;">
                                 <h3 class="card-title">نسبت جدید به اصلاح</h3>
                             </div>
-                            <div class="chart-wrapper">
+                            <div class="chart-wrapper" style="height: 350px;">
                                 <canvas id="bpmn-chart-pie-action"></canvas>
                             </div>
                         </div>
@@ -1122,7 +1118,6 @@
         // Chart instances
         let chartPieAction = null;
         let chartDoughnutDept = null;
-        let chartDoughnutWorker = null;
         let chartLineTrend = null;
         let chartBarDeptActions = null;
 
@@ -1963,61 +1958,6 @@
                     });
                 }
 
-                // --- 3. DOUGHNUT CHART (Workers / Done by) ---
-                if (chartDoughnutWorker) chartDoughnutWorker.destroy();
-                
-                const workers = {};
-                filteredDataset.forEach(r => {
-                    workers[r.worker] = (workers[r.worker] || 0) + 1;
-                });
-                const workerLabels = Object.keys(workers);
-                const workerData = Object.values(workers);
-
-                const ctxWorker = document.getElementById('chart-doughnut-worker').getContext('2d');
-                const colorsPalette = ['#10b981', '#f59e0b', '#06b6d4', '#6366f1', '#d946ef', '#ec4899', '#3b82f6'];
-                const bgColorsWorker = workerLabels.map((l, i) => colorsPalette[i % colorsPalette.length]);
-
-                if (workerLabels.length === 0) {
-                    ctxWorker.clearRect(0,0,300,300);
-                } else {
-                    chartDoughnutWorker = new Chart(ctxWorker, {
-                        type: 'doughnut',
-                        data: {
-                            labels: workerLabels,
-                            datasets: [{
-                                data: workerData,
-                                backgroundColor: bgColorsWorker,
-                                borderWidth: 2,
-                                borderColor: '#151d30',
-                                hoverOffset: 4
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom',
-                                    labels: {
-                                        padding: 15,
-                                        font: { size: 11 }
-                                    }
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            const val = context.raw;
-                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                            const pct = ((val / total) * 100).toFixed(1);
-                                            return context.label + ': ' + val.toLocaleString('fa-IR') + ' (' + pct + '٪)';
-                                        }
-                                    }
-                                }
-                            },
-                            cutout: '60%'
-                        }
-                    });
-                }
 
                 // --- 3.1 BAR CHART (Total Actions per Department split by Edit/Remove) ---
                 if (chartBarDeptActions) chartBarDeptActions.destroy();
@@ -2289,7 +2229,7 @@
                 tr.appendChild(tdDept);
 
                 const tdWorker = document.createElement('td');
-                tdWorker.innerText = row.worker || 'نامشخص';
+                tdWorker.innerText = 'واحد IT';
                 tr.appendChild(tdWorker);
 
                 const tdAction = document.createElement('td');
